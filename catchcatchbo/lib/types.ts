@@ -5,9 +5,9 @@
 export interface AvailableSlot {
   id: string;
   owner_id: string;
-  date: string; // YYYY-MM-DD
-  start_time: string; // HH:MM
-  end_time: string; // HH:MM
+  date: string;
+  start_time: string;
+  end_time: string;
   title: string | null;
   meeting_type: string;
   description: string | null;
@@ -16,9 +16,10 @@ export interface AvailableSlot {
   is_active: boolean;
   created_at: string;
   updated_at: string;
-  // 집계 필드 (쿼리 시 조인)
   booking_count?: number;
 }
+
+export type BookingStatus = "pending" | "confirmed" | "canceled";
 
 export interface Booking {
   id: string;
@@ -27,13 +28,17 @@ export interface Booking {
   guest_contact: string | null;
   meeting_type: string;
   note: string | null;
-  status: "confirmed" | "canceled";
+  status: BookingStatus;
   created_at: string;
   canceled_at: string | null;
-  // 조인 필드
   available_slots?: Pick<
     AvailableSlot,
-    "date" | "start_time" | "end_time" | "title" | "location_text" | "meeting_type"
+    | "date"
+    | "start_time"
+    | "end_time"
+    | "title"
+    | "location_text"
+    | "meeting_type"
   >;
 }
 
@@ -43,7 +48,6 @@ export interface SlotWithCount extends AvailableSlot {
   is_full: boolean;
 }
 
-// 폼 데이터 타입
 export interface SlotFormData {
   date: string;
   start_time: string;
@@ -63,7 +67,6 @@ export interface BookingFormData {
   note: string;
 }
 
-// Server Action 응답 타입
 export interface ActionResult<T = void> {
   success: boolean;
   data?: T;
