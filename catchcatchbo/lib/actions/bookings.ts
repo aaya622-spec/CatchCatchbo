@@ -1,5 +1,6 @@
 "use server";
 
+import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionResult, Booking } from "@/lib/types";
@@ -16,7 +17,10 @@ export async function createBooking(
   const note = (formData.get("note") as string)?.trim() || null;
 
   if (!guestName) {
-    return { success: false, error: "이름을 입력해주세요." };
+    return {
+      success: false,
+      error: "이름을 입력해주세요.",
+    };
   }
 
   if (guestName.length > 20) {
@@ -42,9 +46,20 @@ export async function createBooking(
 
   const supabase = await createClient();
 
+  // 친구가 선택한 일정 확인
   const { data: slot, error: slotError } = await supabase
     .from("available_slots")
-    .select("id, is_active, date, max_guests")
+    .select(`
+      id,
+      is_active,
+      date,
+      start_time,
+      end_time,
+      title,
+      location_text,
+      meeting_type,
+      max_guests
+    `)
     .eq("id", slotId)
     .single();
 
@@ -76,9 +91,13 @@ export async function createBooking(
     };
   }
 
+  // 확정된 예약만 자리 수에 포함
   const { count } = await supabase
     .from("bookings")
-    .select("id", { count: "exact", head: true })
+    .select("id", {
+      count: "exact",
+      head: true,
+    })
     .eq("slot_id", slotId)
     .eq("status", "confirmed");
 
@@ -89,47 +108,62 @@ export async function createBooking(
     };
   }
 
-  const { data: booking, error: insertError } = await supabase
+  const bookingId = randomUUID();
+  const createdAt = new Date().toISOString();
+
+  /*
+   * 친구는 예약 등록만 가능하고 bookings 조회 권한은 없으므로
+   * insert 뒤에 select를 실행하지 않습니다.
+   */
+  const { error: insertError } = await supabase
     .from("bookings")
     .insert({
+      id: bookingId,
       slot_id: slotId,
       guest_name: guestName,
       guest_contact: guestContact,
       meeting_type: meetingType,
       note,
       status: "pending",
-    })
-    .select(
-      `
-      id,
-      slot_id,
-      guest_name,
-      guest_contact,
-      meeting_type,
-      note,
-      status,
-      created_at,
-      canceled_at,
-      available_slots (
-        date,
-        start_time,
-        end_time,
-        title,
-        location_text,
-        meeting_type
-      )
-    `
-    )
-    .single();
+      created_at: createdAt,
+    });
 
   if (insertError) {
     console.error("createBooking error:", insertError);
 
+    const message = insertError.message?.includes(
+      "이미 예약이 꽉 찼어요"
+    )
+      ? "이미 예약이 꽉 찼어요. 다른 날을 선택해줘요."
+      : insertError.message?.includes("지난 날짜")
+        ? "이미 지난 날짜예요."
+        : "예약 신청 중 오류가 발생했어요. 다시 시도해주세요.";
+
     return {
       success: false,
-      error: "예약 신청 중 오류가 발생했어요. 다시 시도해주세요.",
+      error: message,
     };
   }
+
+  const booking: Booking = {
+    id: bookingId,
+    slot_id: slotId,
+    guest_name: guestName,
+    guest_contact: guestContact,
+    meeting_type: meetingType,
+    note,
+    status: "pending",
+    created_at: createdAt,
+    canceled_at: null,
+    available_slots: {
+      date: slot.date,
+      start_time: slot.start_time,
+      end_time: slot.end_time,
+      title: slot.title,
+      location_text: slot.location_text,
+      meeting_type: slot.meeting_type,
+    },
+  };
 
   revalidatePath("/book");
   revalidatePath("/admin");
@@ -137,7 +171,7 @@ export async function createBooking(
   return {
     success: true,
     data: {
-      booking: booking as unknown as Booking,
+      booking,
     },
   };
 }
@@ -168,8 +202,7 @@ export async function confirmBooking(
     })
     .eq("id", bookingId)
     .eq("status", "pending")
-    .select(
-      `
+    .select(`
       id,
       slot_id,
       guest_name,
@@ -187,14 +220,15 @@ export async function confirmBooking(
         location_text,
         meeting_type
       )
-    `
-    )
+    `)
     .single();
 
   if (error || !booking) {
     console.error("confirmBooking error:", error);
 
-    const message = error?.message?.includes("이미 예약이 꽉 찼어요")
+    const message = error?.message?.includes(
+      "이미 예약이 꽉 찼어요"
+    )
       ? "이미 예약 인원이 가득 찼어요."
       : "예약 확정 중 오류가 발생했어요.";
 
@@ -215,7 +249,7 @@ export async function confirmBooking(
   };
 }
 
-// 관리자가 예약 취소 또는 거절
+// 관리자가 예약 거절 또는 취소
 export async function cancelBooking(
   bookingId: string
 ): Promise<ActionResult> {
@@ -254,5 +288,7 @@ export async function cancelBooking(
   revalidatePath("/admin");
   revalidatePath("/book");
 
-  return { success: true };
+  return {
+    success: true,
+  };
 }
