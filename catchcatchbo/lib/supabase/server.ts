@@ -1,4 +1,4 @@
-// 서버 컴포넌트 & Server Action용 Supabase 클라이언트
+// 서버 컴포넌트 & Server Actions용 Supabase 클라이언트
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
@@ -13,13 +13,19 @@ export async function createClient() {
         getAll() {
           return cookieStore.getAll();
         },
-        setAll(cookiesToSet) {
+        setAll(
+          cookiesToSet: {
+            name: string;
+            value: string;
+            options: Parameters<typeof cookieStore.set>[2];
+          }[]
+        ) {
           try {
             cookiesToSet.forEach(({ name, value, options }) =>
               cookieStore.set(name, value, options)
             );
           } catch {
-            // Server Component에서는 쿠키 설정 불가 (무시)
+            // Server Component에서는 쿠키 설정 불가
           }
         },
       },
