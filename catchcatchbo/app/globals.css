@@ -1,0 +1,108 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-cream-100 text-warm-gray-800 antialiased;
+    font-family: -apple-system, BlinkMacSystemFont, "Pretendard Variable", Pretendard,
+      "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  /* 스크롤바 숨기기 (모바일) */
+  ::-webkit-scrollbar {
+    display: none;
+  }
+  scrollbar-width: none;
+}
+
+@layer components {
+  /* 공통 카드 스타일 */
+  .card {
+    @apply bg-white rounded-2xl shadow-sm border border-cream-200;
+  }
+
+  /* 공통 입력 필드 */
+  .input-base {
+    @apply w-full rounded-xl border border-warm-gray-200 bg-white px-4 py-3
+           text-warm-gray-800 placeholder:text-warm-gray-400
+           focus:outline-none focus:ring-2 focus:ring-peach-300 focus:border-transparent
+           transition-all duration-150;
+  }
+
+  /* 기본 버튼 */
+  .btn-primary {
+    @apply inline-flex items-center justify-center rounded-2xl
+           bg-peach-400 text-white font-semibold
+           px-6 py-3.5 text-base
+           active:scale-95 transition-all duration-150
+           disabled:opacity-50 disabled:cursor-not-allowed disabled:scale-100
+           shadow-sm;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center rounded-2xl
+           bg-cream-200 text-warm-gray-600 font-medium
+           px-6 py-3.5 text-base
+           active:scale-95 transition-all duration-150
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center rounded-xl
+           text-warm-gray-500 font-medium
+           px-4 py-2 text-sm
+           active:scale-95 transition-all duration-150
+           hover:bg-cream-200;
+  }
+
+  .btn-danger {
+    @apply inline-flex items-center justify-center rounded-2xl
+           bg-red-50 text-red-500 font-medium
+           px-4 py-2.5 text-sm
+           active:scale-95 transition-all duration-150
+           hover:bg-red-100;
+  }
+}
+
+/* 페이지 전환 애니메이션 */
+@layer utilities {
+  .fade-in {
+    animation: fadeIn 0.25s ease-out;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .slide-up {
+    animation: slideUp 0.3s ease-out;
+  }
+
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
