@@ -18,53 +18,56 @@ export default async function BookPage() {
   const supabase = await createClient();
   const today = getTodayKST();
 
-  // 활성화된 미래 슬롯 + 확정 예약 수 조회
-  const { data: rawSlots } = await supabase
+  const { data: rawSlots, error } = await supabase
     .from("available_slots")
-    .select(
-      `
+    .select(`
       *,
       bookings(count)
-    `
-    )
+    `)
     .eq("is_active", true)
     .gte("date", today)
+    .eq("bookings.status", "confirmed")
     .order("date", { ascending: true })
     .order("start_time", { ascending: true });
 
-  const slots: SlotWithCount[] = (rawSlots ?? []).map((s) => {
-    const confirmed = (s.bookings as { count: number }[])?.[0]?.count ?? 0;
+  if (error) {
+    console.error("BookPage slots error:", error);
+  }
+
+  const slots: SlotWithCount[] = (rawSlots ?? []).map((slot) => {
+    const confirmedCount =
+      (slot.bookings as { count: number }[])?.[0]?.count ?? 0;
+
     return {
-      ...s,
+      ...slot,
       bookings: undefined,
-      booking_count: confirmed,
-      remaining: Math.max(s.max_guests - confirmed, 0),
-      is_full: confirmed >= s.max_guests,
+      booking_count: confirmedCount,
+      remaining: Math.max(slot.max_guests - confirmedCount, 0),
+      is_full: confirmedCount >= slot.max_guests,
     };
   });
 
-  // 예약 가능한 슬롯만 (마감 포함해서 보여주되 CTA만 비활성화)
-  const availableSlots = slots;
-
   return (
     <div className="min-h-screen pb-20">
-      {/* 헤더 */}
       <header className="px-5 pt-8 pb-6">
         <div className="flex items-center gap-2 mb-4">
           <span className="text-2xl">🎯</span>
-          <span className="text-sm font-medium text-warm-gray-400">{APP_NAME}</span>
+          <span className="text-sm font-medium text-warm-gray-400">
+            {APP_NAME}
+          </span>
         </div>
+
         <h1 className="text-xl font-bold text-warm-gray-800 leading-snug">
           {BOOKING_PAGE_GREETING}
         </h1>
+
         <p className="text-sm text-warm-gray-500 mt-2 whitespace-pre-line leading-relaxed">
           {BOOKING_PAGE_SUB}
         </p>
       </header>
 
-      {/* 슬롯 목록 */}
       <div className="px-5">
-        {availableSlots.length === 0 ? (
+        {slots.length === 0 ? (
           <div className="card p-10 text-center">
             <p className="text-4xl mb-4">🌙</p>
             <p className="font-semibold text-warm-gray-600">
@@ -76,14 +79,13 @@ export default async function BookPage() {
           </div>
         ) : (
           <div className="flex flex-col gap-4">
-            {availableSlots.map((slot) => (
+            {slots.map((slot) => (
               <PublicSlotCard key={slot.id} slot={slot} />
             ))}
           </div>
         )}
       </div>
 
-      {/* 푸터 */}
       <footer className="text-center py-10 text-xs text-warm-gray-300">
         {APP_NAME}으로 만들었어요
       </footer>
