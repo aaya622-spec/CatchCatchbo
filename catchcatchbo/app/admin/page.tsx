@@ -48,10 +48,6 @@ export default async function AdminPage() {
 
   const today = getTodayKST();
 
-  /*
-   * 모든 예약의 상태를 가져온 뒤
-   * confirmed만 직접 계산합니다.
-   */
   const {
     data: rawSlots,
     error: slotsError,
@@ -105,8 +101,7 @@ export default async function AdminPage() {
       updated_at: slot.updated_at,
       booking_count: confirmedCount,
       remaining: Math.max(
-        slot.max_guests -
-          confirmedCount,
+        slot.max_guests - confirmedCount,
         0
       ),
       is_full:
@@ -119,9 +114,6 @@ export default async function AdminPage() {
     (slot) => slot.id
   );
 
-  /*
-   * 일정이 하나도 없을 때 .in([], ...) 호출을 피합니다.
-   */
   let bookings: Booking[] = [];
 
   if (slotIds.length > 0) {
@@ -159,7 +151,7 @@ export default async function AdminPage() {
 
   const siteUrl =
     process.env.NEXT_PUBLIC_SITE_URL ??
-    "http://localhost:3000";
+    "https://catch-catchbo.vercel.app";
 
   const bookUrl = `${siteUrl}/book`;
 
@@ -224,8 +216,7 @@ export default async function AdminPage() {
             <p className="text-2xl font-bold text-warm-gray-600">
               {slots.reduce(
                 (total, slot) =>
-                  total +
-                  slot.remaining,
+                  total + slot.remaining,
                 0
               )}
             </p>
@@ -240,6 +231,28 @@ export default async function AdminPage() {
         <ShareSection
           bookUrl={bookUrl}
         />
+
+        {/* Google Calendar 연결 */}
+        <section className="card p-4">
+          <div className="flex flex-col gap-3">
+            <div>
+              <h2 className="font-semibold text-warm-gray-700">
+                Google Calendar
+              </h2>
+
+              <p className="text-sm text-warm-gray-400 mt-1">
+                예약을 확정하면 내 캘린더에 자동으로 등록해요.
+              </p>
+            </div>
+
+            <a
+              href="/api/auth/google"
+              className="btn-primary w-full text-center"
+            >
+              Google Calendar 연결하기
+            </a>
+          </div>
+        </section>
 
         {/* 일정 */}
         <section>
@@ -263,13 +276,11 @@ export default async function AdminPage() {
               </p>
 
               <p className="text-warm-gray-500 font-medium">
-                아직 열어둔 날이
-                없어요
+                아직 열어둔 날이 없어요
               </p>
 
               <p className="text-sm text-warm-gray-400 mt-1">
-                가능한 날짜와 시간을
-                등록해보세요!
+                가능한 날짜와 시간을 등록해보세요!
               </p>
 
               <Link
@@ -290,8 +301,7 @@ export default async function AdminPage() {
                 )
               )}
 
-              {inactiveSlots.length >
-                0 && (
+              {inactiveSlots.length > 0 && (
                 <>
                   <p className="text-xs text-warm-gray-400 mt-2">
                     비활성 일정
