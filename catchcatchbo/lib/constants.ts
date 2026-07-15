@@ -7,32 +7,42 @@ export const APP_NAME = "캐치캐치보";
 export const APP_TAGLINE = "편한 날 하나 골라주세요";
 
 // 공개 예약 페이지 상단 문구
-export const BOOKING_PAGE_GREETING = "이번 달 약속 가능한 날을 열어뒀어요.";
-export const BOOKING_PAGE_SUB = "편한 날 하나 골라주세요.\n장소는 나중에 같이 정해요!";
+export const BOOKING_PAGE_GREETING =
+  "이번 달 약속 가능한 날을 열어뒀어요.";
 
-// 예약 완료 메시지
-export const BOOKING_COMPLETE_TITLE = "약속이 잡혔어요! 🎉";
+export const BOOKING_PAGE_SUB =
+  "편한 날 하나 골라주세요.\n장소는 나중에 같이 정해요!";
+
+// 예약 신청 완료 메시지
+export const BOOKING_COMPLETE_TITLE =
+  "예약 신청이 완료됐어요!";
+
 export const BOOKING_COMPLETE_SUB =
-  "장소와 세부 일정은 따로 이야기해요.";
+  "관리자가 확인 후 확정하면 따로 알려드릴게요.";
 
 // 공유 문구
 export const SHARE_MESSAGE =
-  "나 요즘 일정 잡는 게 너무 귀찮아서 가능한 날 열어놨어ㅋㅋ 편한 날 하나 골라줘";
+  "너랑 시간 맞추려고 가능한 날만 모아봤어.😊 편한 날 하나 골라주면 그날로 약속!";
 
 // 예약 버튼
-export const BOOKING_BUTTON_TEXT = "이날 만날래요";
+export const BOOKING_BUTTON_TEXT =
+  "예약 신청하기";
 
-// 약속 유형 목록
+// 약속 유형 추천 목록
+// 실제 DB에는 아래 value 또는 직접 입력한 문구가 meeting_type으로 저장됩니다.
 export const MEETING_TYPES = [
   { value: "dinner", label: "저녁" },
   { value: "cafe", label: "카페" },
   { value: "drink", label: "술" },
   { value: "exhibition", label: "전시" },
   { value: "exercise", label: "운동" },
+  { value: "travel", label: "여행" },
   { value: "hangout", label: "그냥 만나기" },
+  { value: "custom", label: "직접 입력" },
 ] as const;
 
-export type MeetingTypeValue = (typeof MEETING_TYPES)[number]["value"];
+export type MeetingTypePresetValue =
+  (typeof MEETING_TYPES)[number]["value"];
 
 // 장소 상태 목록
 export const LOCATION_PRESETS = [
@@ -42,13 +52,23 @@ export const LOCATION_PRESETS = [
   { value: "custom", label: "직접 입력" },
 ] as const;
 
-export type LocationPresetValue = (typeof LOCATION_PRESETS)[number]["value"];
+export type LocationPresetValue =
+  (typeof LOCATION_PRESETS)[number]["value"];
 
 // 한국어 요일
-export const KO_WEEKDAYS = ["일", "월", "화", "수", "목", "금", "토"] as const;
+export const KO_WEEKDAYS = [
+  "일",
+  "월",
+  "화",
+  "수",
+  "목",
+  "금",
+  "토",
+] as const;
 
 // 예약 상태
 export const BOOKING_STATUS = {
+  PENDING: "pending",
   CONFIRMED: "confirmed",
   CANCELED: "canceled",
 } as const;
