@@ -3,26 +3,128 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { LOCATION_PRESETS } from "@/lib/constants";
-import type { ActionResult, SlotFormData } from "@/lib/types";
+import {
+  LOCATION_PRESETS,
+  MEETING_TYPES,
+} from "@/lib/constants";
+import type {
+  ActionResult,
+  SlotFormData,
+} from "@/lib/types";
 
-// 장소 텍스트 결정
+// 장소 최종값 결정
 function resolveLocationText(
   preset: string,
   custom: string
 ): string {
   if (preset === "custom") {
     const trimmed = custom.trim();
+
     return trimmed || "장소 미정";
   }
 
   return (
-    LOCATION_PRESETS.find((item) => item.value === preset)
-      ?.value ?? "tbd"
+    LOCATION_PRESETS.find(
+      (item) => item.value === preset
+    )?.value ?? "tbd"
   );
 }
 
-// 입력값 유효성 검사
+// 약속 유형 최종값 결정
+function resolveMeetingType(
+  preset: string,
+  custom: string
+): string {
+  if (preset === "custom") {
+    return custom.trim();
+  }
+
+  const selectedPreset = MEETING_TYPES.find(
+    (item) =>
+      item.value === preset &&
+      item.value !== "custom"
+  );
+
+  return selectedPreset?.value ?? preset.trim();
+}
+
+// FormData를 일정 데이터로 변환
+function getSlotFormData(
+  formData: FormData
+): SlotFormData {
+  const meetingTypePreset =
+    (
+      formData.get(
+        "meeting_type_preset"
+      ) as string
+    ) || "hangout";
+
+  const meetingTypeCustom =
+    (
+      formData.get(
+        "meeting_type_custom"
+      ) as string
+    ) || "";
+
+  const meetingType = resolveMeetingType(
+    meetingTypePreset,
+    meetingTypeCustom
+  );
+
+  return {
+    date:
+      (formData.get("date") as string) ||
+      "",
+
+    start_time:
+      (formData.get(
+        "start_time"
+      ) as string) || "",
+
+    end_time:
+      (formData.get(
+        "end_time"
+      ) as string) || "",
+
+    title:
+      (
+        formData.get("title") as string
+      )?.trim() || "",
+
+    meeting_type: meetingType,
+
+    description:
+      (
+        formData.get(
+          "description"
+        ) as string
+      )?.trim() || "",
+
+    location_preset:
+      (
+        formData.get(
+          "location_preset"
+        ) as string
+      ) || "tbd",
+
+    location_custom:
+      (
+        formData.get(
+          "location_custom"
+        ) as string
+      )?.trim() || "",
+
+    max_guests:
+      parseInt(
+        formData.get(
+          "max_guests"
+        ) as string,
+        10
+      ) || 1,
+  };
+}
+
+// 입력값 검사
 function validateSlotForm(
   data: SlotFormData
 ): string | null {
@@ -38,12 +140,28 @@ function validateSlotForm(
     return "종료 시간을 입력해주세요.";
   }
 
-  if (data.start_time >= data.end_time) {
+  if (
+    data.start_time >= data.end_time
+  ) {
     return "종료 시간은 시작 시간보다 늦어야 해요.";
   }
 
-  if (!data.meeting_type) {
-    return "약속 유형을 선택해주세요.";
+  if (!data.meeting_type.trim()) {
+    return "무엇을 할지 입력해주세요.";
+  }
+
+  if (
+    data.meeting_type.trim().length > 50
+  ) {
+    return "약속 내용은 50자 이내로 입력해주세요.";
+  }
+
+  if (
+    data.location_preset ===
+      "custom" &&
+    !data.location_custom.trim()
+  ) {
+    return "장소를 직접 입력해주세요.";
   }
 
   if (
@@ -56,44 +174,22 @@ function validateSlotForm(
   return null;
 }
 
-// FormData 변환
-function getSlotFormData(
-  formData: FormData
-): SlotFormData {
-  return {
-    date: formData.get("date") as string,
-    start_time: formData.get("start_time") as string,
-    end_time: formData.get("end_time") as string,
-    title:
-      (formData.get("title") as string) || "",
-    meeting_type:
-      formData.get("meeting_type") as string,
-    description:
-      (formData.get("description") as string) || "",
-    location_preset:
-      (formData.get("location_preset") as string) ||
-      "tbd",
-    location_custom:
-      (formData.get("location_custom") as string) ||
-      "",
-    max_guests:
-      parseInt(
-        formData.get("max_guests") as string,
-        10
-      ) || 1,
-  };
-}
-
 // 일정 생성
 export async function createSlot(
   formData: FormData
-): Promise<ActionResult<{ id: string }>> {
-  const supabase = await createClient();
+): Promise<
+  ActionResult<{
+    id: string;
+  }>
+> {
+  const supabase =
+    await createClient();
 
   const {
     data: { user },
     error: authError,
-  } = await supabase.auth.getUser();
+  } =
+    await supabase.auth.getUser();
 
   if (authError || !user) {
     return {
@@ -102,8 +198,11 @@ export async function createSlot(
     };
   }
 
-  const data = getSlotFormData(formData);
-  const validationError = validateSlotForm(data);
+  const data =
+    getSlotFormData(formData);
+
+  const validationError =
+    validateSlotForm(data);
 
   if (validationError) {
     return {
@@ -112,12 +211,16 @@ export async function createSlot(
     };
   }
 
-  const locationText = resolveLocationText(
-    data.location_preset,
-    data.location_custom
-  );
+  const locationText =
+    resolveLocationText(
+      data.location_preset,
+      data.location_custom
+    );
 
-  const { data: slot, error } = await supabase
+  const {
+    data: slot,
+    error,
+  } = await supabase
     .from("available_slots")
     .insert({
       owner_id: user.id,
@@ -125,8 +228,10 @@ export async function createSlot(
       start_time: data.start_time,
       end_time: data.end_time,
       title: data.title || null,
-      meeting_type: data.meeting_type,
-      description: data.description || null,
+      meeting_type:
+        data.meeting_type.trim(),
+      description:
+        data.description || null,
       location_text: locationText,
       max_guests: data.max_guests,
       is_active: true,
@@ -135,7 +240,10 @@ export async function createSlot(
     .single();
 
   if (error || !slot) {
-    console.error("createSlot error:", error);
+    console.error(
+      "createSlot error:",
+      error
+    );
 
     return {
       success: false,
@@ -155,12 +263,14 @@ export async function updateSlot(
   slotId: string,
   formData: FormData
 ): Promise<ActionResult> {
-  const supabase = await createClient();
+  const supabase =
+    await createClient();
 
   const {
     data: { user },
     error: authError,
-  } = await supabase.auth.getUser();
+  } =
+    await supabase.auth.getUser();
 
   if (authError || !user) {
     return {
@@ -169,8 +279,19 @@ export async function updateSlot(
     };
   }
 
-  const data = getSlotFormData(formData);
-  const validationError = validateSlotForm(data);
+  if (!slotId) {
+    return {
+      success: false,
+      error:
+        "수정할 일정 정보가 올바르지 않아요.",
+    };
+  }
+
+  const data =
+    getSlotFormData(formData);
+
+  const validationError =
+    validateSlotForm(data);
 
   if (validationError) {
     return {
@@ -179,10 +300,11 @@ export async function updateSlot(
     };
   }
 
-  const locationText = resolveLocationText(
-    data.location_preset,
-    data.location_custom
-  );
+  const locationText =
+    resolveLocationText(
+      data.location_preset,
+      data.location_custom
+    );
 
   const { error } = await supabase
     .from("available_slots")
@@ -191,8 +313,10 @@ export async function updateSlot(
       start_time: data.start_time,
       end_time: data.end_time,
       title: data.title || null,
-      meeting_type: data.meeting_type,
-      description: data.description || null,
+      meeting_type:
+        data.meeting_type.trim(),
+      description:
+        data.description || null,
       location_text: locationText,
       max_guests: data.max_guests,
     })
@@ -200,11 +324,15 @@ export async function updateSlot(
     .eq("owner_id", user.id);
 
   if (error) {
-    console.error("updateSlot error:", error);
+    console.error(
+      "updateSlot error:",
+      error
+    );
 
     return {
       success: false,
-      error: "일정 수정 중 오류가 발생했어요.",
+      error:
+        "일정 수정 중 오류가 발생했어요.",
     };
   }
 
@@ -215,22 +343,30 @@ export async function updateSlot(
 }
 
 // 일정 완전 삭제
-// Supabase 외래키가 ON DELETE CASCADE로 설정되어 있어야
-// 연결된 예약 내역도 함께 삭제됨
 export async function deleteOrDeactivateSlot(
   slotId: string
 ): Promise<ActionResult> {
-  const supabase = await createClient();
+  const supabase =
+    await createClient();
 
   const {
     data: { user },
     error: authError,
-  } = await supabase.auth.getUser();
+  } =
+    await supabase.auth.getUser();
 
   if (authError || !user) {
     return {
       success: false,
       error: "로그인이 필요해요.",
+    };
+  }
+
+  if (!slotId) {
+    return {
+      success: false,
+      error:
+        "삭제할 일정 정보가 올바르지 않아요.",
     };
   }
 
@@ -241,7 +377,10 @@ export async function deleteOrDeactivateSlot(
     .eq("owner_id", user.id);
 
   if (error) {
-    console.error("deleteSlot error:", error);
+    console.error(
+      "deleteSlot error:",
+      error
+    );
 
     return {
       success: false,
@@ -258,22 +397,32 @@ export async function deleteOrDeactivateSlot(
   };
 }
 
-// 일정 활성화 / 비활성화
+// 일정 활성화·비활성화
 export async function toggleSlotActive(
   slotId: string,
   isActive: boolean
 ): Promise<ActionResult> {
-  const supabase = await createClient();
+  const supabase =
+    await createClient();
 
   const {
     data: { user },
     error: authError,
-  } = await supabase.auth.getUser();
+  } =
+    await supabase.auth.getUser();
 
   if (authError || !user) {
     return {
       success: false,
       error: "로그인이 필요해요.",
+    };
+  }
+
+  if (!slotId) {
+    return {
+      success: false,
+      error:
+        "일정 정보가 올바르지 않아요.",
     };
   }
 
@@ -286,7 +435,10 @@ export async function toggleSlotActive(
     .eq("owner_id", user.id);
 
   if (error) {
-    console.error("toggleSlotActive error:", error);
+    console.error(
+      "toggleSlotActive error:",
+      error
+    );
 
     return {
       success: false,
