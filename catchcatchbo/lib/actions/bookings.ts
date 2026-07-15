@@ -9,6 +9,10 @@ import {
   RESEND_FROM_EMAIL,
 } from "@/lib/mail/resend";
 import {
+  createGoogleCalendarEvent,
+  deleteGoogleCalendarEvent,
+} from "@/lib/google/calendar";
+import {
   formatKoreanDate,
   formatTimeRange,
   getLocationLabel,
@@ -19,21 +23,25 @@ import type {
   Booking,
 } from "@/lib/types";
 
+type BookingWithCalendarEvent = Booking & {
+  google_calendar_event_id?: string | null;
+};
+
+/**
+ * 새 예약 요청 이메일 전송
+ * 메일 발송 실패는 예약 실패로 처리하지 않습니다.
+ */
 async function sendBookingRequestEmail(
   booking: Booking
 ): Promise<void> {
-  if (
-    !resend ||
-    !ADMIN_NOTIFICATION_EMAIL
-  ) {
+  if (!resend || !ADMIN_NOTIFICATION_EMAIL) {
     console.error(
       "Booking email skipped: Resend environment variables are missing."
     );
     return;
   }
 
-  const slot =
-    booking.available_slots;
+  const slot = booking.available_slots;
 
   if (!slot) {
     console.error(
@@ -42,19 +50,16 @@ async function sendBookingRequestEmail(
     return;
   }
 
-  const adminUrl =
-    `${
-      process.env.NEXT_PUBLIC_SITE_URL ??
-      "https://catch-catchbo.vercel.app"
-    }/admin`;
+  const adminUrl = `${
+    process.env.NEXT_PUBLIC_SITE_URL ??
+    "https://catch-catchbo.vercel.app"
+  }/admin`;
 
   const contact =
-    booking.guest_contact ||
-    "입력하지 않음";
+    booking.guest_contact || "입력하지 않음";
 
   const note =
-    booking.note ||
-    "입력하지 않음";
+    booking.note || "입력하지 않음";
 
   const subject =
     `[캐치캐치보] ${booking.guest_name}님의 새 예약 요청`;
@@ -79,13 +84,12 @@ async function sendBookingRequestEmail(
 관리자 페이지:
 ${adminUrl}`;
 
-  const { error } =
-    await resend.emails.send({
-      from: RESEND_FROM_EMAIL,
-      to: ADMIN_NOTIFICATION_EMAIL,
-      subject,
-      text,
-    });
+  const { error } = await resend.emails.send({
+    from: RESEND_FROM_EMAIL,
+    to: ADMIN_NOTIFICATION_EMAIL,
+    subject,
+    text,
+  });
 
   if (error) {
     console.error(
@@ -95,7 +99,9 @@ ${adminUrl}`;
   }
 }
 
-// 친구가 예약 신청
+/**
+ * 친구가 예약 신청
+ */
 export async function createBooking(
   slotId: string,
   formData: FormData
@@ -119,9 +125,11 @@ export async function createBooking(
     )?.trim() || null;
 
   const meetingType =
-    formData.get(
-      "meeting_type"
-    ) as string;
+    (
+      formData.get(
+        "meeting_type"
+      ) as string
+    )?.trim();
 
   const note =
     (
@@ -133,8 +141,7 @@ export async function createBooking(
   if (!guestName) {
     return {
       success: false,
-      error:
-        "이름을 입력해주세요.",
+      error: "이름을 입력해주세요.",
     };
   }
 
@@ -165,6 +172,7 @@ export async function createBooking(
   const supabase =
     await createClient();
 
+  // 선택한 일정 확인
   const {
     data: slot,
     error: slotError,
@@ -219,6 +227,7 @@ export async function createBooking(
     };
   }
 
+  // 확정된 예약만 인원수에 포함
   const { count } =
     await supabase
       .from("bookings")
@@ -227,10 +236,7 @@ export async function createBooking(
         head: true,
       })
       .eq("slot_id", slotId)
-      .eq(
-        "status",
-        "confirmed"
-      );
+      .eq("status", "confirmed");
 
   if (
     (count ?? 0) >=
@@ -249,6 +255,10 @@ export async function createBooking(
   const createdAt =
     new Date().toISOString();
 
+  /*
+   * 비로그인 사용자는 bookings SELECT 권한이 없으므로
+   * insert 후 select를 실행하지 않습니다.
+   */
   const { error: insertError } =
     await supabase
       .from("bookings")
@@ -313,10 +323,7 @@ export async function createBooking(
     },
   };
 
-  /*
-   * 이메일 발송 실패가 예약 실패로 이어지지 않도록
-   * 오류는 함수 내부에서 기록만 합니다.
-   */
+  // 메일 실패는 예약 실패로 처리하지 않음
   await sendBookingRequestEmail(
     booking
   );
@@ -332,7 +339,14 @@ export async function createBooking(
   };
 }
 
-// 관리자가 예약 확정
+/**
+ * 관리자가 예약 확정
+ *
+ * 1. 예약 정보 조회
+ * 2. Google Calendar 일정 생성
+ * 3. 예약 상태를 confirmed로 변경
+ * 4. Calendar 이벤트 ID 저장
+ */
 export async function confirmBooking(
   bookingId: string
 ): Promise<
@@ -357,14 +371,99 @@ export async function confirmBooking(
     };
   }
 
+  if (!bookingId) {
+    return {
+      success: false,
+      error:
+        "예약 정보가 올바르지 않아요.",
+    };
+  }
+
+  // 먼저 pending 예약 정보 조회
   const {
-    data: booking,
-    error,
+    data: pendingBooking,
+    error: bookingError,
+  } = await supabase
+    .from("bookings")
+    .select(`
+      id,
+      slot_id,
+      guest_name,
+      guest_contact,
+      meeting_type,
+      note,
+      status,
+      created_at,
+      canceled_at,
+      google_calendar_event_id,
+      available_slots (
+        date,
+        start_time,
+        end_time,
+        title,
+        location_text,
+        meeting_type
+      )
+    `)
+    .eq("id", bookingId)
+    .eq("status", "pending")
+    .single();
+
+  if (
+    bookingError ||
+    !pendingBooking
+  ) {
+    console.error(
+      "confirmBooking lookup error:",
+      bookingError
+    );
+
+    return {
+      success: false,
+      error:
+        "확정할 예약을 찾을 수 없어요.",
+    };
+  }
+
+  const bookingForCalendar =
+    pendingBooking as unknown as BookingWithCalendarEvent;
+
+  let calendarEventId: string;
+
+  // Google Calendar 일정 생성
+  try {
+    calendarEventId =
+      await createGoogleCalendarEvent(
+        bookingForCalendar
+      );
+  } catch (calendarError) {
+    console.error(
+      "Google Calendar create error:",
+      calendarError
+    );
+
+    const errorMessage =
+      calendarError instanceof Error
+        ? calendarError.message
+        : "Google Calendar 일정 생성에 실패했어요.";
+
+    return {
+      success: false,
+      error: errorMessage,
+    };
+  }
+
+  // 캘린더 생성 후 예약 확정 및 이벤트 ID 저장
+  const {
+    data: confirmedBooking,
+    error: confirmError,
   } = await supabase
     .from("bookings")
     .update({
       status: "confirmed",
       canceled_at: null,
+      google_calendar_event_id:
+        calendarEventId,
     })
     .eq("id", bookingId)
     .eq("status", "pending")
@@ -378,6 +477,7 @@ export async function confirmBooking(
       status,
       created_at,
       canceled_at,
+      google_calendar_event_id,
       available_slots (
         date,
         start_time,
@@ -389,14 +489,32 @@ export async function confirmBooking(
     `)
     .single();
 
-  if (error || !booking) {
+  if (
+    confirmError ||
+    !confirmedBooking
+  ) {
     console.error(
-      "confirmBooking error:",
-      error
+      "confirmBooking update error:",
+      confirmError
     );
 
+    /*
+     * 캘린더는 생성됐지만 DB 확정이 실패한 경우
+     * 방금 생성한 캘린더 일정을 다시 삭제합니다.
+     */
+    try {
+      await deleteGoogleCalendarEvent(
+        calendarEventId
+      );
+    } catch (deleteError) {
+      console.error(
+        "Calendar rollback error:",
+        deleteError
+      );
+    }
+
     const message =
-      error?.message?.includes(
+      confirmError?.message?.includes(
         "이미 예약이 꽉 찼어요"
       )
         ? "이미 예약 인원이 가득 찼어요."
@@ -415,12 +533,17 @@ export async function confirmBooking(
     success: true,
     data: {
       booking:
-        booking as unknown as Booking,
+        confirmedBooking as unknown as Booking,
     },
   };
 }
 
-// 관리자가 예약 거절 또는 취소
+/**
+ * 관리자가 예약 거절 또는 취소
+ *
+ * 확정된 예약에 Google Calendar 이벤트가 있으면
+ * Calendar에서도 함께 삭제합니다.
+ */
 export async function cancelBooking(
   bookingId: string
 ): Promise<ActionResult> {
@@ -441,7 +564,50 @@ export async function cancelBooking(
     };
   }
 
-  const { error } =
+  if (!bookingId) {
+    return {
+      success: false,
+      error:
+        "예약 정보가 올바르지 않아요.",
+    };
+  }
+
+  // 취소 전에 캘린더 이벤트 ID 조회
+  const {
+    data: existingBooking,
+    error: lookupError,
+  } = await supabase
+    .from("bookings")
+    .select(`
+      id,
+      status,
+      google_calendar_event_id
+    `)
+    .eq("id", bookingId)
+    .in("status", [
+      "pending",
+      "confirmed",
+    ])
+    .single();
+
+  if (
+    lookupError ||
+    !existingBooking
+  ) {
+    console.error(
+      "cancelBooking lookup error:",
+      lookupError
+    );
+
+    return {
+      success: false,
+      error:
+        "취소할 예약을 찾을 수 없어요.",
+    };
+  }
+
+  // 먼저 예약 상태 취소 처리
+  const { error: cancelError } =
     await supabase
       .from("bookings")
       .update({
@@ -455,10 +621,10 @@ export async function cancelBooking(
         "confirmed",
       ]);
 
-  if (error) {
+  if (cancelError) {
     console.error(
       "cancelBooking error:",
-      error
+      cancelError
     );
 
     return {
@@ -466,6 +632,43 @@ export async function cancelBooking(
       error:
         "예약 처리 중 오류가 발생했어요.",
     };
+  }
+
+  const calendarEventId =
+    existingBooking.google_calendar_event_id;
+
+  // 캘린더 이벤트가 있으면 삭제
+  if (calendarEventId) {
+    try {
+      await deleteGoogleCalendarEvent(
+        calendarEventId
+      );
+
+      const { error: clearError } =
+        await supabase
+          .from("bookings")
+          .update({
+            google_calendar_event_id:
+              null,
+          })
+          .eq("id", bookingId);
+
+      if (clearError) {
+        console.error(
+          "Calendar event ID clear error:",
+          clearError
+        );
+      }
+    } catch (calendarError) {
+      /*
+       * 캘린더 삭제 실패가 예약 취소 자체를
+       * 되돌리지는 않도록 로그만 남깁니다.
+       */
+      console.error(
+        "Google Calendar delete error:",
+        calendarError
+      );
+    }
   }
 
   revalidatePath("/admin");
