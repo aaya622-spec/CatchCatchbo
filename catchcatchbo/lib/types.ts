@@ -19,18 +19,29 @@ export interface AvailableSlot {
   booking_count?: number;
 }
 
-export type BookingStatus = "pending" | "confirmed" | "canceled";
+export type BookingStatus =
+  | "pending"
+  | "confirmed"
+  | "canceled";
 
 export interface Booking {
   id: string;
   slot_id: string;
+
   guest_name: string;
   guest_contact: string | null;
+
+  booking_title: string;
+  guest_count: number;
+
   meeting_type: string;
   note: string | null;
+
   status: BookingStatus;
+
   created_at: string;
   canceled_at: string | null;
+
   available_slots?: Pick<
     AvailableSlot,
     | "date"
@@ -42,7 +53,8 @@ export interface Booking {
   >;
 }
 
-export interface SlotWithCount extends AvailableSlot {
+export interface SlotWithCount
+  extends AvailableSlot {
   booking_count: number;
   remaining: number;
   is_full: boolean;
@@ -63,6 +75,10 @@ export interface SlotFormData {
 export interface BookingFormData {
   guest_name: string;
   guest_contact: string;
+
+  booking_title: string;
+  guest_count: number;
+
   meeting_type: string;
   note: string;
 }
