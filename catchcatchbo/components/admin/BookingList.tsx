@@ -30,7 +30,8 @@ function BookingStatusBadge({
   const styles: Record<BookingStatus, string> = {
     pending: "bg-amber-50 text-amber-600",
     confirmed: "bg-green-50 text-green-600",
-    canceled: "bg-warm-gray-100 text-warm-gray-400",
+    canceled:
+      "bg-warm-gray-100 text-warm-gray-400",
   };
 
   const labels: Record<BookingStatus, string> = {
@@ -63,12 +64,66 @@ function BookingRow({
     setShowCancelConfirm,
   ] = useState(false);
 
-  const [error, setError] = useState<
-    string | null
-  >(null);
+  const [error, setError] =
+    useState<string | null>(null);
 
   const slot = booking.available_slots;
 
+  /**
+   * 공통 공유 함수
+   */
+  async function shareMessage(
+    title: string,
+    message: string
+  ) {
+    const shareUrl =
+      `${window.location.origin}/book`;
+
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title,
+          text: message,
+          url: shareUrl,
+        });
+
+        return;
+      }
+
+      await navigator.clipboard.writeText(
+        `${message}\n\n${shareUrl}`
+      );
+
+      alert(
+        "메시지와 링크를 복사했어요. 카카오톡에 붙여넣어 주세요."
+      );
+    } catch (shareError) {
+      if (
+        shareError instanceof DOMException &&
+        shareError.name === "AbortError"
+      ) {
+        return;
+      }
+
+      try {
+        await navigator.clipboard.writeText(
+          `${message}\n\n${shareUrl}`
+        );
+
+        alert(
+          "공유창을 열지 못해 메시지를 복사했어요."
+        );
+      } catch {
+        alert(
+          "공유창을 열지 못했어요."
+        );
+      }
+    }
+  }
+
+  /**
+   * 확정 메시지
+   */
   async function shareConfirmedBooking(
     confirmedBooking: Booking
   ) {
@@ -85,7 +140,9 @@ ${confirmedBooking.guest_name}아, 약속 확정됐어! 🎉
 
 💬 ${confirmedBooking.booking_title}
 👥 ${confirmedBooking.guest_count}명
-📅 ${formatKoreanDate(confirmedSlot.date)}
+📅 ${formatKoreanDate(
+      confirmedSlot.date
+    )}
 🕐 ${formatTimeRange(
       confirmedSlot.start_time,
       confirmedSlot.end_time
@@ -96,57 +153,62 @@ ${confirmedBooking.guest_name}아, 약속 확정됐어! 🎉
 
 이날 보자!`;
 
-    const shareUrl = window.location.origin;
-
-    try {
-      if (navigator.share) {
-        await navigator.share({
-          title: "캐치캐치보 약속 확정",
-          text: message,
-          url: shareUrl,
-        });
-
-        return;
-      }
-
-      await navigator.clipboard.writeText(
-        `${message}\n\n${shareUrl}`
-      );
-
-      alert(
-        "확정 메시지와 링크를 복사했어요. 카카오톡에 붙여넣어 주세요."
-      );
-    } catch (shareError) {
-      if (
-        shareError instanceof DOMException &&
-        shareError.name === "AbortError"
-      ) {
-        return;
-      }
-
-      try {
-        await navigator.clipboard.writeText(
-          `${message}\n\n${shareUrl}`
-        );
-
-        alert(
-          "공유창을 열지 못해 확정 메시지를 복사했어요."
-        );
-      } catch {
-        alert(
-          "예약은 확정됐지만 공유창을 열지 못했어요."
-        );
-      }
-    }
+    await shareMessage(
+      "캐치캐치보 약속 확정",
+      message
+    );
   }
 
+  /**
+   * 거절 메시지
+   */
+  async function shareRejectedBooking(
+    rejectedBooking: Booking
+  ) {
+    const rejectedSlot =
+      rejectedBooking.available_slots;
+
+    if (!rejectedSlot) {
+      return;
+    }
+
+    const message = `🎯 캐치캐치보
+
+${rejectedBooking.guest_name}아, 아쉽지만 이번 약속은 어려울 것 같아 🥲
+
+💬 ${rejectedBooking.booking_title}
+👥 ${rejectedBooking.guest_count}명
+📅 ${formatKoreanDate(
+      rejectedSlot.date
+    )}
+🕐 ${formatTimeRange(
+      rejectedSlot.start_time,
+      rejectedSlot.end_time
+    )}
+📍 ${getLocationLabel(
+      rejectedSlot.location_text
+    )}
+
+이번 날짜는 일정이 어려워서 아쉽게 거절했어.
+다른 가능한 날짜를 골라줘!`;
+
+    await shareMessage(
+      "캐치캐치보 약속 안내",
+      message
+    );
+  }
+
+  /**
+   * 예약 확정
+   */
   function handleConfirm() {
     setError(null);
 
     startTransition(async () => {
-      const result = await confirmBooking(
-        booking.id
-      );
+      const result =
+        await confirmBooking(
+          booking.id
+        );
 
       if (
         !result.success ||
@@ -168,13 +230,20 @@ ${confirmedBooking.guest_name}아, 약속 확정됐어! 🎉
     });
   }
 
+  /**
+   * 예약 거절 / 취소
+   */
   function handleCancel() {
     setError(null);
 
+    const wasPending =
+      booking.status === "pending";
+
     startTransition(async () => {
-      const result = await cancelBooking(
-        booking.id
-      );
+      const result =
+        await cancelBooking(
+          booking.id
+        );
 
       if (!result.success) {
         setError(
@@ -186,6 +255,17 @@ ${confirmedBooking.guest_name}아, 약속 확정됐어! 🎉
       }
 
       setShowCancelConfirm(false);
+
+      /**
+       * pending 상태의 예약을 거절한 경우에만
+       * 친구에게 보낼 공유창 실행
+       */
+      if (wasPending) {
+        await shareRejectedBooking(
+          booking
+        );
+      }
+
       router.refresh();
     });
   }
@@ -239,7 +319,9 @@ ${confirmedBooking.guest_name}아, 약속 확정됐어! 🎉
       {slot && (
         <div className="bg-cream-100 rounded-xl px-3 py-2 text-sm text-warm-gray-600">
           <p className="font-medium">
-            {formatKoreanDate(slot.date)}
+            {formatKoreanDate(
+              slot.date
+            )}
           </p>
 
           <p className="text-warm-gray-400 text-xs mt-0.5">
@@ -265,27 +347,38 @@ ${confirmedBooking.guest_name}아, 약속 확정됐어! 🎉
         </p>
       )}
 
-      {/* 오류 메시지 */}
+      {/* 오류 */}
       {error && (
         <p className="text-xs text-red-500">
           {error}
         </p>
       )}
 
-      {/* 거절 또는 취소 확인 */}
+      {/* 거절 / 취소 확인 */}
       {showCancelConfirm && (
         <div className="bg-red-50 rounded-xl p-3 flex flex-col gap-2">
           <p className="text-sm text-red-600 font-medium">
-            {booking.status === "pending"
+            {booking.status ===
+            "pending"
               ? "이 예약 신청을 거절할까요?"
               : "확정된 예약을 취소할까요?"}
           </p>
+
+          {booking.status ===
+            "pending" && (
+            <p className="text-xs text-warm-gray-500">
+              거절 후 친구에게 보낼
+              메시지 공유창이 열려요.
+            </p>
+          )}
 
           <div className="flex gap-2">
             <button
               type="button"
               onClick={() =>
-                setShowCancelConfirm(false)
+                setShowCancelConfirm(
+                  false
+                )
               }
               className="btn-ghost text-sm flex-1"
               disabled={isPending}
@@ -303,21 +396,24 @@ ${confirmedBooking.guest_name}아, 약속 확정됐어! 🎉
                 ? "처리 중…"
                 : booking.status ===
                     "pending"
-                  ? "예약 거절"
+                  ? "거절하고 알리기"
                   : "예약 취소"}
             </button>
           </div>
         </div>
       )}
 
-      {/* 확정 대기 상태 버튼 */}
-      {booking.status === "pending" &&
+      {/* 확정 대기 */}
+      {booking.status ===
+        "pending" &&
         !showCancelConfirm && (
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
               onClick={() =>
-                setShowCancelConfirm(true)
+                setShowCancelConfirm(
+                  true
+                )
               }
               disabled={isPending}
               className="btn-ghost border border-warm-gray-200"
@@ -327,7 +423,9 @@ ${confirmedBooking.guest_name}아, 약속 확정됐어! 🎉
 
             <button
               type="button"
-              onClick={handleConfirm}
+              onClick={
+                handleConfirm
+              }
               disabled={isPending}
               className="btn-primary"
             >
@@ -338,13 +436,16 @@ ${confirmedBooking.guest_name}아, 약속 확정됐어! 🎉
           </div>
         )}
 
-      {/* 확정된 예약 버튼 */}
-      {booking.status === "confirmed" &&
+      {/* 확정 예약 */}
+      {booking.status ===
+        "confirmed" &&
         !showCancelConfirm && (
           <button
             type="button"
             onClick={() =>
-              setShowCancelConfirm(true)
+              setShowCancelConfirm(
+                true
+              )
             }
             disabled={isPending}
             className="btn-danger self-start"
@@ -353,22 +454,40 @@ ${confirmedBooking.guest_name}아, 약속 확정됐어! 🎉
           </button>
         )}
 
-      {/* 취소 또는 거절 기록 */}
-      {booking.status === "canceled" && (
-        <p className="text-xs text-warm-gray-400">
-          {booking.canceled_at
-            ? `처리일: ${new Date(
-                booking.canceled_at
-              ).toLocaleDateString(
-                "ko-KR",
-                {
-                  timeZone:
-                    "Asia/Seoul",
+      {/* 취소 / 거절 */}
+      {booking.status ===
+        "canceled" && (
+          <div className="flex flex-col gap-2">
+            <p className="text-xs text-warm-gray-400">
+              {booking.canceled_at
+                ? `처리일: ${new Date(
+                    booking.canceled_at
+                  ).toLocaleDateString(
+                    "ko-KR",
+                    {
+                      timeZone:
+                        "Asia/Seoul",
+                    }
+                  )}`
+                : "취소됨"}
+            </p>
+
+            {/* 공유창을 닫았을 때 다시 보낼 수 있음 */}
+            {slot && (
+              <button
+                type="button"
+                onClick={() =>
+                  shareRejectedBooking(
+                    booking
+                  )
                 }
-              )}`
-            : "취소됨"}
-        </p>
-      )}
+                className="btn-ghost border border-warm-gray-200 text-sm self-start"
+              >
+                거절 메시지 다시 보내기
+              </button>
+            )}
+          </div>
+        )}
     </div>
   );
 }
@@ -390,40 +509,51 @@ export default function BookingList({
     );
   }
 
-  const pending = bookings.filter(
-    (booking) =>
-      booking.status === "pending"
-  );
+  const pending =
+    bookings.filter(
+      (booking) =>
+        booking.status ===
+        "pending"
+    );
 
-  const confirmed = bookings.filter(
-    (booking) =>
-      booking.status === "confirmed"
-  );
+  const confirmed =
+    bookings.filter(
+      (booking) =>
+        booking.status ===
+        "confirmed"
+    );
 
-  const canceled = bookings.filter(
-    (booking) =>
-      booking.status === "canceled"
-  );
+  const canceled =
+    bookings.filter(
+      (booking) =>
+        booking.status ===
+        "canceled"
+    );
 
   return (
     <div className="flex flex-col gap-6">
+      {/* 확정 대기 */}
       {pending.length > 0 && (
         <section>
           <h3 className="text-sm font-semibold text-amber-600 mb-3">
-            확정 대기 · {pending.length}건
+            확정 대기 ·{" "}
+            {pending.length}건
           </h3>
 
           <div className="flex flex-col gap-3">
-            {pending.map((booking) => (
-              <BookingRow
-                key={booking.id}
-                booking={booking}
-              />
-            ))}
+            {pending.map(
+              (booking) => (
+                <BookingRow
+                  key={booking.id}
+                  booking={booking}
+                />
+              )
+            )}
           </div>
         </section>
       )}
 
+      {/* 확정 */}
       {confirmed.length > 0 && (
         <section>
           <h3 className="text-sm font-semibold text-warm-gray-500 mb-3">
@@ -444,6 +574,7 @@ export default function BookingList({
         </section>
       )}
 
+      {/* 취소 / 거절 */}
       {canceled.length > 0 && (
         <section>
           <h3 className="text-sm font-semibold text-warm-gray-400 mb-3">
