@@ -53,6 +53,35 @@ export interface Booking {
   >;
 }
 
+// ============================================================
+// 날짜 제안
+// ============================================================
+
+export type DateProposalStatus =
+  | "pending"
+  | "accepted"
+  | "rejected";
+
+export interface DateProposal {
+  id: string;
+
+  guest_name: string;
+  guest_contact: string | null;
+
+  proposed_date: string;
+  proposed_time: string | null;
+
+  booking_title: string;
+  guest_count: number;
+
+  meeting_type: string;
+  note: string | null;
+
+  status: DateProposalStatus;
+
+  created_at: string;
+}
+
 export interface SlotWithCount
   extends AvailableSlot {
   booking_count: number;
@@ -75,6 +104,20 @@ export interface SlotFormData {
 export interface BookingFormData {
   guest_name: string;
   guest_contact: string;
+
+  booking_title: string;
+  guest_count: number;
+
+  meeting_type: string;
+  note: string;
+}
+
+export interface DateProposalFormData {
+  guest_name: string;
+  guest_contact: string;
+
+  proposed_date: string;
+  proposed_time: string;
 
   booking_title: string;
   guest_count: number;
