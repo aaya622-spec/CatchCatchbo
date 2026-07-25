@@ -61,18 +61,26 @@ async function sendBookingRequestEmail(
   const note =
     booking.note || "입력하지 않음";
 
+  const bookingTitle =
+    booking.booking_title || "약속 이름 없음";
+
+  const guestCount =
+    booking.guest_count ?? 1;
+
   const subject =
     `[캐치캐치보] ${booking.guest_name}님의 새 예약 요청`;
 
   const text = `새 예약 요청이 들어왔어요.
 
 신청자: ${booking.guest_name}
+약속 이름: ${bookingTitle}
+인원: ${guestCount}명
 날짜: ${formatKoreanDate(slot.date)}
 시간: ${formatTimeRange(
     slot.start_time,
     slot.end_time
   )}
-약속: ${getMeetingTypeLabel(
+약속 유형: ${getMeetingTypeLabel(
     booking.meeting_type
   )}
 장소: ${getLocationLabel(
@@ -124,6 +132,20 @@ export async function createBooking(
       ) as string
     )?.trim() || null;
 
+  const bookingTitle =
+    (
+      formData.get(
+        "booking_title"
+      ) as string
+    )?.trim();
+
+  const guestCount =
+    Number(
+      formData.get(
+        "guest_count"
+      ) ?? 1
+    );
+
   const meetingType =
     (
       formData.get(
@@ -138,6 +160,9 @@ export async function createBooking(
       ) as string
     )?.trim() || null;
 
+  /**
+   * 입력값 검증
+   */
   if (!guestName) {
     return {
       success: false,
@@ -150,6 +175,34 @@ export async function createBooking(
       success: false,
       error:
         "이름은 20자 이내로 입력해주세요.",
+    };
+  }
+
+  if (!bookingTitle) {
+    return {
+      success: false,
+      error:
+        "약속 이름을 입력해주세요.",
+    };
+  }
+
+  if (bookingTitle.length > 40) {
+    return {
+      success: false,
+      error:
+        "약속 이름은 40자 이내로 입력해주세요.",
+    };
+  }
+
+  if (
+    !Number.isInteger(guestCount) ||
+    guestCount < 1 ||
+    guestCount > 4
+  ) {
+    return {
+      success: false,
+      error:
+        "인원은 1명에서 4명까지 선택해주세요.",
     };
   }
 
@@ -172,7 +225,9 @@ export async function createBooking(
   const supabase =
     await createClient();
 
-  // 선택한 일정 확인
+  /**
+   * 선택한 일정 확인
+   */
   const {
     data: slot,
     error: slotError,
@@ -208,6 +263,9 @@ export async function createBooking(
     };
   }
 
+  /**
+   * 오늘 날짜 확인
+   */
   const todayKST =
     new Intl.DateTimeFormat(
       "en-CA",
@@ -227,7 +285,14 @@ export async function createBooking(
     };
   }
 
-  // 확정된 예약만 인원수에 포함
+  /**
+   * 현재는 기존 max_guests 로직 유지
+   *
+   * 신청자가 선택하는 guest_count는
+   * 실제 함께 오는 인원 정보이고,
+   * 기존 슬롯의 예약 가능 여부 로직은
+   * 다음 단계에서 따로 정리합니다.
+   */
   const { count } =
     await supabase
       .from("bookings")
@@ -255,7 +320,9 @@ export async function createBooking(
   const createdAt =
     new Date().toISOString();
 
-  /*
+  /**
+   * 예약 생성
+   *
    * 비로그인 사용자는 bookings SELECT 권한이 없으므로
    * insert 후 select를 실행하지 않습니다.
    */
@@ -265,14 +332,28 @@ export async function createBooking(
       .insert({
         id: bookingId,
         slot_id: slotId,
-        guest_name: guestName,
+
+        guest_name:
+          guestName,
+
         guest_contact:
           guestContact,
+
+        booking_title:
+          bookingTitle,
+
+        guest_count:
+          guestCount,
+
         meeting_type:
           meetingType,
+
         note,
+
         status: "pending",
-        created_at: createdAt,
+
+        created_at:
+          createdAt,
       });
 
   if (insertError) {
@@ -298,32 +379,65 @@ export async function createBooking(
     };
   }
 
+  /**
+   * 예약 완료 화면 / 메일에서 사용할 Booking 객체
+   */
   const booking: Booking = {
     id: bookingId,
-    slot_id: slotId,
-    guest_name: guestName,
+
+    slot_id:
+      slotId,
+
+    guest_name:
+      guestName,
+
     guest_contact:
       guestContact,
+
+    booking_title:
+      bookingTitle,
+
+    guest_count:
+      guestCount,
+
     meeting_type:
       meetingType,
+
     note,
-    status: "pending",
-    created_at: createdAt,
-    canceled_at: null,
+
+    status:
+      "pending",
+
+    created_at:
+      createdAt,
+
+    canceled_at:
+      null,
+
     available_slots: {
-      date: slot.date,
+      date:
+        slot.date,
+
       start_time:
         slot.start_time,
-      end_time: slot.end_time,
-      title: slot.title,
+
+      end_time:
+        slot.end_time,
+
+      title:
+        slot.title,
+
       location_text:
         slot.location_text,
+
       meeting_type:
         slot.meeting_type,
     },
   };
 
-  // 메일 실패는 예약 실패로 처리하지 않음
+  /**
+   * 메일 실패는 예약 실패로 처리하지 않음
+   */
   await sendBookingRequestEmail(
     booking
   );
@@ -379,7 +493,9 @@ export async function confirmBooking(
     };
   }
 
-  // 먼저 pending 예약 정보 조회
+  /**
+   * pending 예약 정보 조회
+   */
   const {
     data: pendingBooking,
     error: bookingError,
@@ -390,6 +506,8 @@ export async function confirmBooking(
       slot_id,
       guest_name,
       guest_contact,
+      booking_title,
+      guest_count,
       meeting_type,
       note,
       status,
@@ -430,7 +548,9 @@ export async function confirmBooking(
 
   let calendarEventId: string;
 
-  // Google Calendar 일정 생성
+  /**
+   * Google Calendar 일정 생성
+   */
   try {
     calendarEventId =
       await createGoogleCalendarEvent(
@@ -449,19 +569,26 @@ export async function confirmBooking(
 
     return {
       success: false,
-      error: errorMessage,
+      error:
+        errorMessage,
     };
   }
 
-  // 캘린더 생성 후 예약 확정 및 이벤트 ID 저장
+  /**
+   * 캘린더 생성 후 예약 확정
+   */
   const {
     data: confirmedBooking,
     error: confirmError,
   } = await supabase
     .from("bookings")
     .update({
-      status: "confirmed",
-      canceled_at: null,
+      status:
+        "confirmed",
+
+      canceled_at:
+        null,
+
       google_calendar_event_id:
         calendarEventId,
     })
@@ -472,6 +599,8 @@ export async function confirmBooking(
       slot_id,
       guest_name,
       guest_contact,
+      booking_title,
+      guest_count,
       meeting_type,
       note,
       status,
@@ -498,9 +627,9 @@ export async function confirmBooking(
       confirmError
     );
 
-    /*
-     * 캘린더는 생성됐지만 DB 확정이 실패한 경우
-     * 방금 생성한 캘린더 일정을 다시 삭제합니다.
+    /**
+     * 캘린더 생성은 됐지만
+     * DB 확정이 실패한 경우 롤백
      */
     try {
       await deleteGoogleCalendarEvent(
@@ -572,7 +701,9 @@ export async function cancelBooking(
     };
   }
 
-  // 취소 전에 캘린더 이벤트 ID 조회
+  /**
+   * 취소 전에 캘린더 이벤트 ID 조회
+   */
   const {
     data: existingBooking,
     error: lookupError,
@@ -606,12 +737,16 @@ export async function cancelBooking(
     };
   }
 
-  // 먼저 예약 상태 취소 처리
+  /**
+   * 예약 상태 취소 처리
+   */
   const { error: cancelError } =
     await supabase
       .from("bookings")
       .update({
-        status: "canceled",
+        status:
+          "canceled",
+
         canceled_at:
           new Date().toISOString(),
       })
@@ -637,7 +772,9 @@ export async function cancelBooking(
   const calendarEventId =
     existingBooking.google_calendar_event_id;
 
-  // 캘린더 이벤트가 있으면 삭제
+  /**
+   * Google Calendar 이벤트가 있으면 삭제
+   */
   if (calendarEventId) {
     try {
       await deleteGoogleCalendarEvent(
@@ -660,9 +797,9 @@ export async function cancelBooking(
         );
       }
     } catch (calendarError) {
-      /*
-       * 캘린더 삭제 실패가 예약 취소 자체를
-       * 되돌리지는 않도록 로그만 남깁니다.
+      /**
+       * 캘린더 삭제 실패가
+       * 예약 취소 자체를 되돌리지는 않음
        */
       console.error(
         "Google Calendar delete error:",
