@@ -1,5 +1,8 @@
 import Link from "next/link";
-import { MeetingTypeBadge, RemainingBadge } from "@/components/ui/Badge";
+import {
+  MeetingTypeBadge,
+  RemainingBadge,
+} from "@/components/ui/Badge";
 import {
   formatKoreanDate,
   formatTimeRange,
@@ -12,48 +15,76 @@ interface PublicSlotCardProps {
   slot: SlotWithCount;
 }
 
-export default function PublicSlotCard({ slot }: PublicSlotCardProps) {
+export default function PublicSlotCard({
+  slot,
+}: PublicSlotCardProps) {
   const isFull = slot.remaining === 0;
 
   return (
     <div
       className={`card p-5 flex flex-col gap-3 transition-all ${
-        isFull ? "opacity-60" : "hover:shadow-md active:scale-[0.99]"
+        isFull
+          ? "opacity-60"
+          : "hover:shadow-md active:scale-[0.99]"
       }`}
     >
-      {/* 날짜 + 배지 */}
+      {/* 날짜 + 예약 가능 배지 */}
       <div className="flex items-start justify-between gap-2">
         <div>
           <p className="font-bold text-warm-gray-800 text-lg leading-tight">
             {formatKoreanDate(slot.date)}
           </p>
+
           <p className="text-sm text-warm-gray-500 mt-1">
-            {formatTimeRange(slot.start_time, slot.end_time)}
+            {formatTimeRange(
+              slot.start_time,
+              slot.end_time
+            )}
           </p>
         </div>
-        <RemainingBadge remaining={slot.remaining} max={slot.max_guests} />
+
+        <RemainingBadge
+          remaining={slot.remaining}
+          max={slot.max_guests}
+        />
       </div>
+
+      {/* 약속 제목 */}
+      {slot.title && (
+        <p className="text-base font-semibold text-warm-gray-700 leading-snug">
+          {slot.title}
+        </p>
+      )}
 
       {/* 약속 유형 + 장소 */}
       <div className="flex items-center gap-2 flex-wrap">
         <MeetingTypeBadge
           value={slot.meeting_type}
-          label={getMeetingTypeLabel(slot.meeting_type)}
+          label={getMeetingTypeLabel(
+            slot.meeting_type
+          )}
         />
+
         <span className="text-sm text-warm-gray-400">
-          📍 {getLocationLabel(slot.location_text)}
+          📍{" "}
+          {getLocationLabel(
+            slot.location_text
+          )}
         </span>
       </div>
 
       {/* 설명 */}
       {slot.description && (
-        <p className="text-sm text-warm-gray-400">{slot.description}</p>
+        <p className="text-sm text-warm-gray-400 leading-relaxed">
+          {slot.description}
+        </p>
       )}
 
       {/* 인원이 여러 명이면 현황 표시 */}
       {slot.max_guests > 1 && (
         <p className="text-xs text-warm-gray-400">
-          현재 {slot.booking_count}/{slot.max_guests}명 예약 완료
+          현재 {slot.booking_count}/
+          {slot.max_guests}명 예약 완료
         </p>
       )}
 
