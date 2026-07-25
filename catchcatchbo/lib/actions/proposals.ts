@@ -30,9 +30,7 @@ export async function createProposal(
 
   const guestContact =
     (
-      formData.get(
-        "guest_contact"
-      ) as string
+      formData.get("guest_contact") as string
     )?.trim() || null;
 
   const bookingTitle = (
@@ -45,9 +43,7 @@ export async function createProposal(
 
   const proposedTime =
     (
-      formData.get(
-        "proposed_time"
-      ) as string
+      formData.get("proposed_time") as string
     )?.trim() || null;
 
   const guestCount = Number(
@@ -63,10 +59,18 @@ export async function createProposal(
       formData.get("note") as string
     )?.trim() || null;
 
+  // 입력값 검증
   if (!guestName) {
     return {
       success: false,
       error: "이름을 입력해주세요.",
+    };
+  }
+
+  if (guestName.length > 20) {
+    return {
+      success: false,
+      error: "이름은 20자 이내로 입력해주세요.",
     };
   }
 
@@ -77,6 +81,13 @@ export async function createProposal(
     };
   }
 
+  if (bookingTitle.length > 40) {
+    return {
+      success: false,
+      error: "약속 이름은 40자 이내로 입력해주세요.",
+    };
+  }
+
   if (!proposedDate) {
     return {
       success: false,
@@ -84,10 +95,18 @@ export async function createProposal(
     };
   }
 
-  if (!meetingType) {
+  const todayKST =
+    new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Seoul",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date());
+
+  if (proposedDate < todayKST) {
     return {
       success: false,
-      error: "약속 유형을 선택해주세요.",
+      error: "지난 날짜는 제안할 수 없어요.",
     };
   }
 
@@ -103,53 +122,44 @@ export async function createProposal(
     };
   }
 
-  const todayKST =
-    new Intl.DateTimeFormat("en-CA", {
-      timeZone: "Asia/Seoul",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    }).format(new Date());
-
-  if (proposedDate < todayKST) {
+  if (!meetingType) {
     return {
       success: false,
-      error:
-        "지난 날짜는 제안할 수 없어요.",
+      error: "약속 유형을 선택해주세요.",
     };
   }
 
-  const supabase =
-    await createClient();
+  const supabase = await createClient();
 
-  const { error } = await supabase
-    .from("date_proposals")
-    .insert({
-      id: randomUUID(),
-      guest_name: guestName,
-      guest_contact: guestContact,
-      proposed_date: proposedDate,
-      proposed_time: proposedTime,
-      booking_title: bookingTitle,
-      guest_count: guestCount,
-      meeting_type: meetingType,
-      note,
-      status: "pending",
-    });
+  const { error: insertError } =
+    await supabase
+      .from("date_proposals")
+      .insert({
+        id: randomUUID(),
+        guest_name: guestName,
+        guest_contact: guestContact,
+        proposed_date: proposedDate,
+        proposed_time: proposedTime,
+        booking_title: bookingTitle,
+        guest_count: guestCount,
+        meeting_type: meetingType,
+        note,
+        status: "pending",
+      });
 
-  if (error) {
+  if (insertError) {
     console.error(
-      "createProposal error:",
-      error
+      "createProposal insert error:",
+      insertError
     );
 
     return {
       success: false,
-      error:
-        "날짜 제안 중 오류가 발생했어요.",
+      error: `DB 오류: ${insertError.message} / code: ${insertError.code}`,
     };
   }
 
+  // 관리자 이메일 알림
   if (
     resend &&
     ADMIN_NOTIFICATION_EMAIL
@@ -207,8 +217,7 @@ export async function acceptProposal(
     proposal: DateProposal;
   }>
 > {
-  const supabase =
-    await createClient();
+  const supabase = await createClient();
 
   const {
     data: { user },
@@ -243,6 +252,7 @@ export async function acceptProposal(
     return {
       success: false,
       error:
+        error?.message ??
         "날짜 제안 수락 중 오류가 발생했어요.",
     };
   }
@@ -252,8 +262,7 @@ export async function acceptProposal(
   return {
     success: true,
     data: {
-      proposal:
-        data as DateProposal,
+      proposal: data as DateProposal,
     },
   };
 }
@@ -269,8 +278,7 @@ export async function rejectProposal(
     proposal: DateProposal;
   }>
 > {
-  const supabase =
-    await createClient();
+  const supabase = await createClient();
 
   const {
     data: { user },
@@ -305,6 +313,7 @@ export async function rejectProposal(
     return {
       success: false,
       error:
+        error?.message ??
         "날짜 제안 거절 중 오류가 발생했어요.",
     };
   }
@@ -314,8 +323,7 @@ export async function rejectProposal(
   return {
     success: true,
     data: {
-      proposal:
-        data as DateProposal,
+      proposal: data as DateProposal,
     },
   };
 }
