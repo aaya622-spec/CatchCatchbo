@@ -74,6 +74,7 @@ export async function createProposal(
       formData.get("note") as string
     )?.trim() || null;
 
+  // 입력값 검증
   if (!guestName) {
     return {
       success: false,
@@ -81,10 +82,24 @@ export async function createProposal(
     };
   }
 
+  if (guestName.length > 20) {
+    return {
+      success: false,
+      error: "이름은 20자 이내로 입력해주세요.",
+    };
+  }
+
   if (!bookingTitle) {
     return {
       success: false,
       error: "약속 이름을 입력해주세요.",
+    };
+  }
+
+  if (bookingTitle.length > 40) {
+    return {
+      success: false,
+      error: "약속 이름은 40자 이내로 입력해주세요.",
     };
   }
 
@@ -190,11 +205,11 @@ export async function createProposal(
 
     return {
       success: false,
-      error: `DB 오류: ${insertError.message}`,
+      error: `DB 오류: ${insertError.message} / code: ${insertError.code}`,
     };
   }
 
-  // 관리자 이메일
+  // 관리자 이메일 알림
   if (
     resend &&
     ADMIN_NOTIFICATION_EMAIL
@@ -274,7 +289,18 @@ export async function acceptProposal(
     };
   }
 
-  // 제안 조회
+  if (!proposalId) {
+    return {
+      success: false,
+      error:
+        "날짜 제안 정보가 올바르지 않아요.",
+    };
+  }
+
+  // ------------------------------------------------------------
+  // 1. pending 제안 조회
+  // ------------------------------------------------------------
+
   const {
     data: proposal,
     error: proposalError,
@@ -289,6 +315,11 @@ export async function acceptProposal(
     proposalError ||
     !proposal
   ) {
+    console.error(
+      "acceptProposal lookup error:",
+      proposalError
+    );
+
     return {
       success: false,
       error:
@@ -303,40 +334,52 @@ export async function acceptProposal(
     return {
       success: false,
       error:
-        "시작/종료 시간이 없는 제안이에요.",
+        "시작 시간 또는 종료 시간이 없는 제안이에요.",
     };
   }
 
-  const slotId = randomUUID();
-  const bookingId = randomUUID();
+  const slotId =
+    randomUUID();
+
+  const bookingId =
+    randomUUID();
+
   const now =
     new Date().toISOString();
 
-  // 제안으로 슬롯 생성
-  const { error: slotError } =
-    await supabase
-      .from("available_slots")
-      .insert({
-        id: slotId,
-        owner_id: user.id,
-        date:
-          proposal.proposed_date,
-        start_time:
-          proposal.proposed_time,
-        end_time:
-          proposal.proposed_end_time,
-        title:
-          proposal.booking_title,
-        meeting_type:
-          proposal.meeting_type,
-        description:
-          proposal.note,
-        location_text: "tbd",
-        max_guests: 1,
-        is_active: true,
-        created_at: now,
-        updated_at: now,
-      });
+  // ------------------------------------------------------------
+  // 2. 임시 활성 슬롯 생성
+  //
+  // bookings INSERT 시 기존 DB 트리거가
+  // 비활성 슬롯 예약을 막기 때문에 일단 true로 생성
+  // ------------------------------------------------------------
+
+  const {
+    error: slotError,
+  } = await supabase
+    .from("available_slots")
+    .insert({
+      id: slotId,
+      owner_id: user.id,
+      date:
+        proposal.proposed_date,
+      start_time:
+        proposal.proposed_time,
+      end_time:
+        proposal.proposed_end_time,
+      title:
+        proposal.booking_title,
+      meeting_type:
+        proposal.meeting_type,
+      description:
+        proposal.note,
+      location_text:
+        "tbd",
+      max_guests: 1,
+      is_active: true,
+      created_at: now,
+      updated_at: now,
+    });
 
   if (slotError) {
     console.error(
@@ -346,51 +389,64 @@ export async function acceptProposal(
 
     return {
       success: false,
-      error:
-        "제안 일정 생성에 실패했어요.",
+      error: `일정 생성 실패: ${slotError.message} / code: ${slotError.code}`,
     };
   }
 
-  // confirmed 예약 생성
-  const { error: bookingError } =
-    await supabase
-      .from("bookings")
-      .insert({
-        id: bookingId,
-        slot_id: slotId,
-        guest_name:
-          proposal.guest_name,
-        guest_contact:
-          proposal.guest_contact,
-        booking_title:
-          proposal.booking_title,
-        guest_count:
-          proposal.guest_count,
-        meeting_type:
-          proposal.meeting_type,
-        note:
-          proposal.note,
-        status: "confirmed",
-        created_at: now,
-        canceled_at: null,
-      });
+  // ------------------------------------------------------------
+  // 3. confirmed 예약 생성
+  // ------------------------------------------------------------
 
- if (bookingError) {
-  console.error(
-    "Proposal booking create error:",
-    bookingError
-  );
+  const {
+    error: bookingError,
+  } = await supabase
+    .from("bookings")
+    .insert({
+      id: bookingId,
+      slot_id: slotId,
+      guest_name:
+        proposal.guest_name,
+      guest_contact:
+        proposal.guest_contact,
+      booking_title:
+        proposal.booking_title,
+      guest_count:
+        proposal.guest_count,
+      meeting_type:
+        proposal.meeting_type,
+      note:
+        proposal.note,
+      status: "confirmed",
+      created_at: now,
+      canceled_at: null,
+    });
 
-  await supabase
-    .from("available_slots")
-    .delete()
-    .eq("id", slotId);
+  if (bookingError) {
+    console.error(
+      "Proposal booking create error:",
+      bookingError
+    );
 
-  return {
-    success: false,
-    error: `예약 생성 실패: ${bookingError.message} / code: ${bookingError.code}`,
-  };
-}
+    // 슬롯 롤백
+    const {
+      error: rollbackSlotError,
+    } = await supabase
+      .from("available_slots")
+      .delete()
+      .eq("id", slotId);
+
+    if (rollbackSlotError) {
+      console.error(
+        "Proposal slot rollback error:",
+        rollbackSlotError
+      );
+    }
+
+    return {
+      success: false,
+      error: `예약 생성 실패: ${bookingError.message} / code: ${bookingError.code}`,
+    };
+  }
 
   const booking: Booking = {
     id: bookingId,
@@ -440,7 +496,10 @@ export async function acceptProposal(
     },
   };
 
-  // Google Calendar 생성
+  // ------------------------------------------------------------
+  // 4. Google Calendar 일정 생성
+  // ------------------------------------------------------------
+
   let calendarEventId: string;
 
   try {
@@ -450,20 +509,39 @@ export async function acceptProposal(
       );
   } catch (calendarError) {
     console.error(
-      "Proposal Calendar error:",
+      "Proposal Google Calendar error:",
       calendarError
     );
 
-    // 예약/슬롯 롤백
-    await supabase
+    // 예약 롤백
+    const {
+      error: rollbackBookingError,
+    } = await supabase
       .from("bookings")
       .delete()
       .eq("id", bookingId);
 
-    await supabase
+    if (rollbackBookingError) {
+      console.error(
+        "Proposal booking rollback error:",
+        rollbackBookingError
+      );
+    }
+
+    // 슬롯 롤백
+    const {
+      error: rollbackSlotError,
+    } = await supabase
       .from("available_slots")
       .delete()
       .eq("id", slotId);
+
+    if (rollbackSlotError) {
+      console.error(
+        "Proposal slot rollback error:",
+        rollbackSlotError
+      );
+    }
 
     return {
       success: false,
@@ -474,15 +552,19 @@ export async function acceptProposal(
     };
   }
 
-  // 캘린더 ID 저장
-  const { error: calendarIdError } =
-    await supabase
-      .from("bookings")
-      .update({
-        google_calendar_event_id:
-          calendarEventId,
-      })
-      .eq("id", bookingId);
+  // ------------------------------------------------------------
+  // 5. Google Calendar 이벤트 ID 예약에 저장
+  // ------------------------------------------------------------
+
+  const {
+    error: calendarIdError,
+  } = await supabase
+    .from("bookings")
+    .update({
+      google_calendar_event_id:
+        calendarEventId,
+    })
+    .eq("id", bookingId);
 
   if (calendarIdError) {
     console.error(
@@ -490,22 +572,25 @@ export async function acceptProposal(
       calendarIdError
     );
 
+    // Calendar 롤백
     try {
       await deleteGoogleCalendarEvent(
         calendarEventId
       );
-    } catch (error) {
+    } catch (deleteError) {
       console.error(
         "Proposal Calendar rollback error:",
-        error
+        deleteError
       );
     }
 
+    // 예약 롤백
     await supabase
       .from("bookings")
       .delete()
       .eq("id", bookingId);
 
+    // 슬롯 롤백
     await supabase
       .from("available_slots")
       .delete()
@@ -513,12 +598,14 @@ export async function acceptProposal(
 
     return {
       success: false,
-      error:
-        "Google Calendar 정보를 저장하지 못했어요.",
+      error: `Google Calendar 정보 저장 실패: ${calendarIdError.message}`,
     };
   }
 
-  // 마지막에 proposal accepted 처리
+  // ------------------------------------------------------------
+  // 6. 날짜 제안 accepted 처리
+  // ------------------------------------------------------------
+
   const {
     data: acceptedProposal,
     error: acceptError,
@@ -537,26 +624,29 @@ export async function acceptProposal(
     !acceptedProposal
   ) {
     console.error(
-      "Proposal accept error:",
+      "Proposal accept status error:",
       acceptError
     );
 
+    // Calendar 롤백
     try {
       await deleteGoogleCalendarEvent(
         calendarEventId
       );
-    } catch (error) {
+    } catch (deleteError) {
       console.error(
-        "Proposal final rollback Calendar error:",
-        error
+        "Proposal Calendar final rollback error:",
+        deleteError
       );
     }
 
+    // 예약 롤백
     await supabase
       .from("bookings")
       .delete()
       .eq("id", bookingId);
 
+    // 슬롯 롤백
     await supabase
       .from("available_slots")
       .delete()
@@ -565,8 +655,36 @@ export async function acceptProposal(
     return {
       success: false,
       error:
+        acceptError?.message ??
         "날짜 제안 확정 처리에 실패했어요.",
     };
+  }
+
+  // ------------------------------------------------------------
+  // 7. 확정이 끝난 슬롯은 공개 예약에서 숨김
+  // ------------------------------------------------------------
+
+  const {
+    error: deactivateError,
+  } = await supabase
+    .from("available_slots")
+    .update({
+      is_active: false,
+      updated_at:
+        new Date().toISOString(),
+    })
+    .eq("id", slotId);
+
+  if (deactivateError) {
+    console.error(
+      "Proposal slot deactivate error:",
+      deactivateError
+    );
+
+    /*
+     * 이 단계는 예약/Calendar/제안 확정까지는 이미 성공한 상태.
+     * 비활성 처리 실패 때문에 전체 성공을 되돌리지는 않음.
+     */
   }
 
   revalidatePath("/admin");
@@ -577,6 +695,7 @@ export async function acceptProposal(
     data: {
       proposal:
         acceptedProposal as DateProposal,
+
       booking,
     },
   };
@@ -610,6 +729,14 @@ export async function rejectProposal(
     };
   }
 
+  if (!proposalId) {
+    return {
+      success: false,
+      error:
+        "날짜 제안 정보가 올바르지 않아요.",
+    };
+  }
+
   const {
     data,
     error,
@@ -632,6 +759,7 @@ export async function rejectProposal(
     return {
       success: false,
       error:
+        error?.message ??
         "날짜 제안 거절 중 오류가 발생했어요.",
     };
   }
