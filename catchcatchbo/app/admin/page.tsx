@@ -14,8 +14,7 @@ import type {
   DateProposal,
 } from "@/lib/types";
 
-export const dynamic =
-  "force-dynamic";
+export const dynamic = "force-dynamic";
 
 type RawAdminSlot = {
   id: string;
@@ -27,10 +26,15 @@ type RawAdminSlot = {
   meeting_type: string;
   description: string | null;
   location_text: string;
+
+  image_url: string | null;
+  image_position: string | null;
+
   max_guests: number;
   is_active: boolean;
   created_at: string;
   updated_at: string;
+
   bookings:
     | {
         status: string;
@@ -39,13 +43,11 @@ type RawAdminSlot = {
 };
 
 export default async function AdminPage() {
-  const supabase =
-    await createClient();
+  const supabase = await createClient();
 
   const {
     data: { user },
-  } =
-    await supabase.auth.getUser();
+  } = await supabase.auth.getUser();
 
   if (!user) {
     redirect("/login");
@@ -91,41 +93,38 @@ export default async function AdminPage() {
       slot.bookings ?? []
     ).filter(
       (booking) =>
-        booking.status ===
-        "confirmed"
+        booking.status === "confirmed"
     ).length;
 
     return {
       id: slot.id,
       owner_id: slot.owner_id,
       date: slot.date,
-      start_time:
-        slot.start_time,
+      start_time: slot.start_time,
       end_time: slot.end_time,
       title: slot.title,
-      meeting_type:
-        slot.meeting_type,
-      description:
-        slot.description,
-      location_text:
-        slot.location_text,
-      max_guests:
-        slot.max_guests,
+      meeting_type: slot.meeting_type,
+      description: slot.description,
+      location_text: slot.location_text,
+
+      image_url: slot.image_url ?? null,
+      image_position:
+        slot.image_position ?? "center",
+
+      max_guests: slot.max_guests,
       is_active: slot.is_active,
-      created_at:
-        slot.created_at,
-      updated_at:
-        slot.updated_at,
-      booking_count:
-        confirmedCount,
+      created_at: slot.created_at,
+      updated_at: slot.updated_at,
+
+      booking_count: confirmedCount,
+
       remaining: Math.max(
-        slot.max_guests -
-          confirmedCount,
+        slot.max_guests - confirmedCount,
         0
       ),
+
       is_full:
-        confirmedCount >=
-        slot.max_guests,
+        confirmedCount >= slot.max_guests,
     };
   });
 
@@ -153,7 +152,9 @@ export default async function AdminPage() {
           end_time,
           title,
           location_text,
-          meeting_type
+          meeting_type,
+          image_url,
+          image_position
         )
       `)
       .in("slot_id", slotIds)
@@ -169,8 +170,7 @@ export default async function AdminPage() {
     }
 
     bookings =
-      (bookingRows as Booking[]) ??
-      [];
+      (bookingRows as Booking[]) ?? [];
   }
 
   // ============================================================
@@ -195,45 +195,36 @@ export default async function AdminPage() {
   }
 
   const proposals: DateProposal[] =
-    (proposalRows as DateProposal[]) ??
-    [];
+    (proposalRows as DateProposal[]) ?? [];
 
   // ============================================================
   // 화면용 데이터
   // ============================================================
 
   const siteUrl =
-    process.env
-      .NEXT_PUBLIC_SITE_URL ??
+    process.env.NEXT_PUBLIC_SITE_URL ??
     "https://catch-catchbo.vercel.app";
 
-  const bookUrl =
-    `${siteUrl}/book`;
+  const bookUrl = `${siteUrl}/book`;
 
-  const activeSlots =
-    slots.filter(
-      (slot) =>
-        slot.is_active
-    );
+  const activeSlots = slots.filter(
+    (slot) => slot.is_active
+  );
 
-  const inactiveSlots =
-    slots.filter(
-      (slot) =>
-        !slot.is_active
-    );
+  const inactiveSlots = slots.filter(
+    (slot) => !slot.is_active
+  );
 
   const confirmedBookings =
     bookings.filter(
       (booking) =>
-        booking.status ===
-        "confirmed"
+        booking.status === "confirmed"
     );
 
   const pendingProposals =
     proposals.filter(
       (proposal) =>
-        proposal.status ===
-        "pending"
+        proposal.status === "pending"
     );
 
   return (
@@ -271,9 +262,7 @@ export default async function AdminPage() {
 
           <div className="card p-3 text-center">
             <p className="text-2xl font-bold text-sage-400">
-              {
-                confirmedBookings.length
-              }
+              {confirmedBookings.length}
             </p>
 
             <p className="text-xs text-warm-gray-400 mt-0.5">
@@ -283,9 +272,7 @@ export default async function AdminPage() {
 
           <div className="card p-3 text-center">
             <p className="text-2xl font-bold text-warm-gray-600">
-              {
-                pendingProposals.length
-              }
+              {pendingProposals.length}
             </p>
 
             <p className="text-xs text-warm-gray-400 mt-0.5">
@@ -308,9 +295,8 @@ export default async function AdminPage() {
               </h2>
 
               <p className="text-sm text-warm-gray-400 mt-1">
-                예약을 확정하면 내
-                캘린더에 자동으로
-                등록해요.
+                예약을 확정하면 내 캘린더에
+                자동으로 등록해요.
               </p>
             </div>
 
@@ -318,8 +304,7 @@ export default async function AdminPage() {
               href="/api/auth/google"
               className="btn-primary w-full text-center"
             >
-              Google Calendar
-              연결하기
+              Google Calendar 연결하기
             </a>
           </div>
         </section>
@@ -331,13 +316,9 @@ export default async function AdminPage() {
               💌 날짜 제안
             </h2>
 
-            {pendingProposals.length >
-              0 && (
+            {pendingProposals.length > 0 && (
               <span className="text-xs font-medium bg-amber-50 text-amber-600 rounded-full px-2.5 py-1">
-                {
-                  pendingProposals.length
-                }
-                건
+                {pendingProposals.length}건
               </span>
             )}
           </div>
@@ -369,8 +350,7 @@ export default async function AdminPage() {
               </p>
 
               <p className="text-warm-gray-500 font-medium">
-                아직 열어둔 날이
-                없어요
+                아직 열어둔 날이 없어요
               </p>
 
               <p className="text-sm text-warm-gray-400 mt-1">
@@ -396,8 +376,7 @@ export default async function AdminPage() {
                 )
               )}
 
-              {inactiveSlots.length >
-                0 && (
+              {inactiveSlots.length > 0 && (
                 <>
                   <p className="text-xs text-warm-gray-400 mt-2">
                     비활성 일정
@@ -406,12 +385,8 @@ export default async function AdminPage() {
                   {inactiveSlots.map(
                     (slot) => (
                       <AdminSlotCard
-                        key={
-                          slot.id
-                        }
-                        slot={
-                          slot
-                        }
+                        key={slot.id}
+                        slot={slot}
                       />
                     )
                   )}
