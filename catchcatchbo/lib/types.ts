@@ -70,6 +70,7 @@ export interface DateProposal {
 
   proposed_date: string;
   proposed_time: string | null;
+  proposed_end_time: string | null;
 
   booking_title: string;
   guest_count: number;
@@ -118,6 +119,7 @@ export interface DateProposalFormData {
 
   proposed_date: string;
   proposed_time: string;
+  proposed_end_time: string;
 
   booking_title: string;
   guest_count: number;
