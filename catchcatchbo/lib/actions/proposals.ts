@@ -376,22 +376,22 @@ export async function acceptProposal(
       });
 
   if (bookingError) {
-    console.error(
-      "Proposal booking create error:",
-      bookingError
-    );
+  console.error(
+    "Proposal booking create error:",
+    bookingError
+  );
 
-    await supabase
-      .from("available_slots")
-      .delete()
-      .eq("id", slotId);
+  await supabase
+    .from("available_slots")
+    .delete()
+    .eq("id", slotId);
 
-    return {
-      success: false,
-      error:
-        "예약 생성에 실패했어요.",
-    };
-  }
+  return {
+    success: false,
+    error:
+      "예약 생성에 실패했어요.",
+  };
+}
 
   const booking: Booking = {
     id: bookingId,
