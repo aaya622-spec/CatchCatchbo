@@ -12,62 +12,61 @@ import {
   formatKoreanDate,
   getMeetingTypeLabel,
 } from "@/lib/utils";
-import type { ActionResult } from "@/lib/types";
+import type {
+  ActionResult,
+  DateProposal,
+} from "@/lib/types";
+
+// ============================================================
+// 친구가 날짜 제안
+// ============================================================
 
 export async function createProposal(
   formData: FormData
 ): Promise<ActionResult> {
-  const guestName =
-    (
-      formData.get("guest_name") as string
-    )?.trim();
+  const guestName = (
+    formData.get("guest_name") as string
+  )?.trim();
 
   const guestContact =
     (
-      formData.get("guest_contact") as string
+      formData.get(
+        "guest_contact"
+      ) as string
     )?.trim() || null;
 
-  const bookingTitle =
-    (
-      formData.get("booking_title") as string
-    )?.trim();
+  const bookingTitle = (
+    formData.get("booking_title") as string
+  )?.trim();
 
-  const proposedDate =
-    (
-      formData.get("proposed_date") as string
-    )?.trim();
+  const proposedDate = (
+    formData.get("proposed_date") as string
+  )?.trim();
 
   const proposedTime =
     (
-      formData.get("proposed_time") as string
+      formData.get(
+        "proposed_time"
+      ) as string
     )?.trim() || null;
 
   const guestCount = Number(
     formData.get("guest_count") ?? 1
   );
 
-  const meetingType =
-    (
-      formData.get("meeting_type") as string
-    )?.trim();
+  const meetingType = (
+    formData.get("meeting_type") as string
+  )?.trim();
 
   const note =
     (
       formData.get("note") as string
     )?.trim() || null;
 
-  // 입력값 확인
   if (!guestName) {
     return {
       success: false,
       error: "이름을 입력해주세요.",
-    };
-  }
-
-  if (guestName.length > 20) {
-    return {
-      success: false,
-      error: "이름은 20자 이내로 입력해주세요.",
     };
   }
 
@@ -78,17 +77,29 @@ export async function createProposal(
     };
   }
 
-  if (bookingTitle.length > 40) {
-    return {
-      success: false,
-      error: "약속 이름은 40자 이내로 입력해주세요.",
-    };
-  }
-
   if (!proposedDate) {
     return {
       success: false,
       error: "희망 날짜를 선택해주세요.",
+    };
+  }
+
+  if (!meetingType) {
+    return {
+      success: false,
+      error: "약속 유형을 선택해주세요.",
+    };
+  }
+
+  if (
+    !Number.isInteger(guestCount) ||
+    guestCount < 1 ||
+    guestCount > 4
+  ) {
+    return {
+      success: false,
+      error:
+        "인원은 1명에서 4명까지 선택해주세요.",
     };
   }
 
@@ -103,29 +114,13 @@ export async function createProposal(
   if (proposedDate < todayKST) {
     return {
       success: false,
-      error: "지난 날짜는 제안할 수 없어요.",
+      error:
+        "지난 날짜는 제안할 수 없어요.",
     };
   }
 
-  if (
-    !Number.isInteger(guestCount) ||
-    guestCount < 1 ||
-    guestCount > 4
-  ) {
-    return {
-      success: false,
-      error: "인원은 1명에서 4명까지 선택해주세요.",
-    };
-  }
-
-  if (!meetingType) {
-    return {
-      success: false,
-      error: "약속 유형을 선택해주세요.",
-    };
-  }
-
-  const supabase = await createClient();
+  const supabase =
+    await createClient();
 
   const { error } = await supabase
     .from("date_proposals")
@@ -151,11 +146,10 @@ export async function createProposal(
     return {
       success: false,
       error:
-        "날짜 제안 중 오류가 발생했어요. 다시 시도해주세요.",
+        "날짜 제안 중 오류가 발생했어요.",
     };
   }
 
-  // 관리자에게 이메일 알림
   if (
     resend &&
     ADMIN_NOTIFICATION_EMAIL
@@ -165,28 +159,16 @@ export async function createProposal(
       "https://catch-catchbo.vercel.app"
     }/admin`;
 
-    const timeLabel =
-      proposedTime || "시간 협의";
-
-    const contactLabel =
-      guestContact || "입력하지 않음";
-
-    const noteLabel =
-      note || "입력하지 않음";
-
-    const subject =
-      `[캐치캐치보] ${guestName}님의 날짜 제안`;
-
     const text = `새로운 날짜 제안이 들어왔어요.
 
 신청자: ${guestName}
 약속 이름: ${bookingTitle}
 인원: ${guestCount}명
 희망 날짜: ${formatKoreanDate(proposedDate)}
-희망 시간: ${timeLabel}
+희망 시간: ${proposedTime || "시간 협의"}
 약속 유형: ${getMeetingTypeLabel(meetingType)}
-연락처: ${contactLabel}
-메모: ${noteLabel}
+연락처: ${guestContact || "입력하지 않음"}
+메모: ${note || "입력하지 않음"}
 
 관리자 페이지:
 ${adminUrl}`;
@@ -195,12 +177,11 @@ ${adminUrl}`;
       await resend.emails.send({
         from: RESEND_FROM_EMAIL,
         to: ADMIN_NOTIFICATION_EMAIL,
-        subject,
+        subject: `[캐치캐치보] ${guestName}님의 날짜 제안`,
         text,
       });
 
     if (mailError) {
-      // 메일 실패 때문에 날짜 제안까지 실패시키지는 않음
       console.error(
         "Proposal email error:",
         mailError
@@ -212,5 +193,129 @@ ${adminUrl}`;
 
   return {
     success: true,
+  };
+}
+
+// ============================================================
+// 관리자가 날짜 제안 수락
+// ============================================================
+
+export async function acceptProposal(
+  proposalId: string
+): Promise<
+  ActionResult<{
+    proposal: DateProposal;
+  }>
+> {
+  const supabase =
+    await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return {
+      success: false,
+      error: "로그인이 필요해요.",
+    };
+  }
+
+  const {
+    data,
+    error,
+  } = await supabase
+    .from("date_proposals")
+    .update({
+      status: "accepted",
+    })
+    .eq("id", proposalId)
+    .eq("status", "pending")
+    .select("*")
+    .single();
+
+  if (error || !data) {
+    console.error(
+      "acceptProposal error:",
+      error
+    );
+
+    return {
+      success: false,
+      error:
+        "날짜 제안 수락 중 오류가 발생했어요.",
+    };
+  }
+
+  revalidatePath("/admin");
+
+  return {
+    success: true,
+    data: {
+      proposal:
+        data as DateProposal,
+    },
+  };
+}
+
+// ============================================================
+// 관리자가 날짜 제안 거절
+// ============================================================
+
+export async function rejectProposal(
+  proposalId: string
+): Promise<
+  ActionResult<{
+    proposal: DateProposal;
+  }>
+> {
+  const supabase =
+    await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return {
+      success: false,
+      error: "로그인이 필요해요.",
+    };
+  }
+
+  const {
+    data,
+    error,
+  } = await supabase
+    .from("date_proposals")
+    .update({
+      status: "rejected",
+    })
+    .eq("id", proposalId)
+    .eq("status", "pending")
+    .select("*")
+    .single();
+
+  if (error || !data) {
+    console.error(
+      "rejectProposal error:",
+      error
+    );
+
+    return {
+      success: false,
+      error:
+        "날짜 제안 거절 중 오류가 발생했어요.",
+    };
+  }
+
+  revalidatePath("/admin");
+
+  return {
+    success: true,
+    data: {
+      proposal:
+        data as DateProposal,
+    },
   };
 }
