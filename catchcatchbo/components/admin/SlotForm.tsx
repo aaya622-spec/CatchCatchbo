@@ -486,6 +486,52 @@ export default function SlotForm({
           </div>
         )}
 
+        {/* 배너 글자색 */}
+<div className="flex flex-col gap-2">
+  <label className="text-sm font-medium text-warm-gray-700">
+    배너 글자색
+  </label>
+
+  <div className="grid grid-cols-2 gap-2">
+    <label className="cursor-pointer">
+      <input
+        type="radio"
+        name="image_text_color"
+        value="dark"
+        defaultChecked={
+          !slot?.image_text_color ||
+          slot.image_text_color === "dark"
+        }
+        className="sr-only peer"
+      />
+
+      <div className="py-2.5 rounded-xl border text-sm text-center transition-all border-warm-gray-200 bg-white text-warm-gray-700 peer-checked:border-peach-300 peer-checked:bg-peach-100 peer-checked:text-peach-500">
+        어두운 글자
+      </div>
+    </label>
+
+    <label className="cursor-pointer">
+      <input
+        type="radio"
+        name="image_text_color"
+        value="light"
+        defaultChecked={
+          slot?.image_text_color === "light"
+        }
+        className="sr-only peer"
+      />
+
+      <div className="py-2.5 rounded-xl border text-sm text-center transition-all border-warm-gray-200 bg-white text-warm-gray-700 peer-checked:border-peach-300 peer-checked:bg-peach-100 peer-checked:text-peach-500">
+        밝은 글자
+      </div>
+    </label>
+  </div>
+
+  <p className="text-xs text-warm-gray-400">
+    이미지 배경에 맞춰 글자색을 선택해주세요.
+  </p>
+</div>
+
         <input
           id="slot_image"
           name="slot_image"
