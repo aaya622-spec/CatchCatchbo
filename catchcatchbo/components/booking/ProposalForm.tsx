@@ -1,11 +1,17 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { Input, Textarea } from "@/components/ui/Input";
-import Button from "@/components/ui/Button";
 import {
-  MEETING_TYPES,
-} from "@/lib/constants";
+  useState,
+  useTransition,
+} from "react";
+import Link from "next/link";
+import {
+  Input,
+  Textarea,
+} from "@/components/ui/Input";
+import Button from "@/components/ui/Button";
+import { MEETING_TYPES } from "@/lib/constants";
+import { createProposal } from "@/lib/actions/proposals";
 
 export default function ProposalForm() {
   const [
@@ -15,30 +21,82 @@ export default function ProposalForm() {
 
   const [
     isPending,
+    startTransition,
   ] = useTransition();
 
   const [error, setError] =
     useState<string | null>(null);
 
+  const [isCompleted, setIsCompleted] =
+    useState(false);
+
+  const today =
+    new Intl.DateTimeFormat(
+      "en-CA",
+      {
+        timeZone: "Asia/Seoul",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }
+    ).format(new Date());
+
   function handleSubmit(
     event: React.FormEvent<HTMLFormElement>
   ) {
     event.preventDefault();
+    setError(null);
 
-    setError(
-      "아직 제출 기능을 연결하는 중이에요."
-    );
+    const formData =
+      new FormData(
+        event.currentTarget
+      );
+
+    startTransition(async () => {
+      const result =
+        await createProposal(
+          formData
+        );
+
+      if (!result.success) {
+        setError(
+          result.error ??
+            "날짜 제안 중 오류가 발생했어요."
+        );
+
+        return;
+      }
+
+      setIsCompleted(true);
+    });
   }
 
-  const today = new Intl.DateTimeFormat(
-    "en-CA",
-    {
-      timeZone: "Asia/Seoul",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    }
-  ).format(new Date());
+  if (isCompleted) {
+    return (
+      <div className="flex flex-col items-center text-center py-12">
+        <div className="text-6xl mb-6">
+          💌
+        </div>
+
+        <h2 className="text-2xl font-bold text-warm-gray-800">
+          날짜 제안을 보냈어요!
+        </h2>
+
+        <p className="text-sm text-warm-gray-500 mt-3 leading-relaxed">
+          일정 확인해보고
+          <br />
+          가능한지 알려드릴게요 😊
+        </p>
+
+        <Link
+          href="/book"
+          className="btn-primary w-full text-center mt-8"
+        >
+          예약 페이지로 돌아가기
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <form
@@ -176,8 +234,9 @@ export default function ProposalForm() {
         rows={3}
       />
 
+      {/* 오류 */}
       {error && (
-        <div className="bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 text-sm text-amber-600">
+        <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-sm text-red-500">
           {error}
         </div>
       )}
@@ -192,7 +251,8 @@ export default function ProposalForm() {
       </Button>
 
       <p className="text-xs text-center text-warm-gray-400">
-        제안을 보내면 확인 후 따로 알려드릴게요 😊
+        제안을 보내면 확인 후 따로
+        알려드릴게요 😊
       </p>
     </form>
   );
