@@ -2,23 +2,30 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import BookingCalendar from "@/components/booking/BookingCalendar";
 import NoticeTicker from "@/components/booking/NoticeTicker";
+import SlotBannerCarousel from "@/components/booking/SlotBannerCarousel";
 import {
   APP_NAME,
   BOOKING_PAGE_GREETING,
   BOOKING_PAGE_SUB,
 } from "@/lib/constants";
 import { getTodayKST } from "@/lib/utils";
-import type { SlotWithCount } from "@/lib/types";
+import type {
+  SlotWithCount,
+} from "@/lib/types";
 
-export const dynamic = "force-dynamic";
+export const dynamic =
+  "force-dynamic";
 
 export const metadata = {
   title: "약속 잡기",
 };
 
 export default async function BookPage() {
-  const supabase = await createClient();
-  const today = getTodayKST();
+  const supabase =
+    await createClient();
+
+  const today =
+    getTodayKST();
 
   const {
     data: rawSlots,
@@ -46,12 +53,23 @@ export default async function BookPage() {
     rawSlots ?? []
   ).map((slot) => ({
     ...slot,
+
+    image_url:
+      slot.image_url ?? null,
+
+    image_position:
+      slot.image_position ??
+      "center",
+
     booking_count:
       slot.booking_count ?? 0,
+
     remaining:
       slot.remaining ?? 0,
+
     is_full:
-      (slot.remaining ?? 0) === 0,
+      (slot.remaining ?? 0) ===
+      0,
   }));
 
   return (
@@ -78,10 +96,15 @@ export default async function BookPage() {
       </header>
 
       <main className="px-5">
-        {/* 흐르는 공지 */}
-        <div className="mb-6">
+        {/* 공지 */}
+        <div className="mb-5">
           <NoticeTicker />
         </div>
+
+        {/* 추천 일정 자동 롤링 배너 */}
+        <SlotBannerCarousel
+          slots={slots}
+        />
 
         {/* 캘린더 */}
         {slots.length === 0 ? (
@@ -106,7 +129,7 @@ export default async function BookPage() {
           />
         )}
 
-        {/* 원하는 날짜 제안 */}
+        {/* 날짜 제안 */}
         <section className="mt-8">
           <div className="card p-5 text-center">
             <div className="text-3xl mb-3">
@@ -134,7 +157,6 @@ export default async function BookPage() {
         </section>
       </main>
 
-      {/* 푸터 */}
       <footer className="text-center py-10 text-xs text-warm-gray-300">
         {APP_NAME}으로 만들었어요
       </footer>
