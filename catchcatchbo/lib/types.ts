@@ -13,6 +13,7 @@ export interface AvailableSlot {
   description: string | null;
   location_text: string;
 
+  // 대표 이미지
   image_url: string | null;
   image_position: string | null;
 
@@ -46,6 +47,10 @@ export interface Booking {
   created_at: string;
   canceled_at: string | null;
 
+  /*
+   * 예약/캘린더 로직에서 필요한 일정 정보만 사용.
+   * 이미지 정보는 Booking에 강제로 요구하지 않음.
+   */
   available_slots?: Pick<
     AvailableSlot,
     | "date"
@@ -54,8 +59,6 @@ export interface Booking {
     | "title"
     | "location_text"
     | "meeting_type"
-    | "image_url"
-    | "image_position"
   >;
 }
 
@@ -89,12 +92,20 @@ export interface DateProposal {
   created_at: string;
 }
 
+// ============================================================
+// 공개 / 관리자 일정
+// ============================================================
+
 export interface SlotWithCount
   extends AvailableSlot {
   booking_count: number;
   remaining: number;
   is_full: boolean;
 }
+
+// ============================================================
+// 일정 폼
+// ============================================================
 
 export interface SlotFormData {
   date: string;
@@ -114,6 +125,10 @@ export interface SlotFormData {
   max_guests: number;
 }
 
+// ============================================================
+// 예약 폼
+// ============================================================
+
 export interface BookingFormData {
   guest_name: string;
   guest_contact: string;
@@ -124,6 +139,10 @@ export interface BookingFormData {
   meeting_type: string;
   note: string;
 }
+
+// ============================================================
+// 날짜 제안 폼
+// ============================================================
 
 export interface DateProposalFormData {
   guest_name: string;
@@ -139,6 +158,10 @@ export interface DateProposalFormData {
   meeting_type: string;
   note: string;
 }
+
+// ============================================================
+// Server Action 공통 응답
+// ============================================================
 
 export interface ActionResult<T = void> {
   success: boolean;
