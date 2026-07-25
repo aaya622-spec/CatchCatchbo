@@ -12,6 +12,10 @@ export interface AvailableSlot {
   meeting_type: string;
   description: string | null;
   location_text: string;
+
+  image_url: string | null;
+  image_position: string | null;
+
   max_guests: number;
   is_active: boolean;
   created_at: string;
@@ -50,6 +54,8 @@ export interface Booking {
     | "title"
     | "location_text"
     | "meeting_type"
+    | "image_url"
+    | "image_position"
   >;
 }
 
@@ -94,11 +100,17 @@ export interface SlotFormData {
   date: string;
   start_time: string;
   end_time: string;
+
   title: string;
   meeting_type: string;
   description: string;
+
   location_preset: string;
   location_custom: string;
+
+  image_url: string;
+  image_position: string;
+
   max_guests: number;
 }
 
