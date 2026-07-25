@@ -3,6 +3,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import AdminSlotCard from "@/components/admin/AdminSlotCard";
 import BookingList from "@/components/admin/BookingList";
+import ProposalList from "@/components/admin/ProposalList";
 import ShareSection from "@/components/admin/ShareSection";
 import { signOut } from "@/lib/actions/auth";
 import { APP_NAME } from "@/lib/constants";
@@ -10,9 +11,11 @@ import { getTodayKST } from "@/lib/utils";
 import type {
   SlotWithCount,
   Booking,
+  DateProposal,
 } from "@/lib/types";
 
-export const dynamic = "force-dynamic";
+export const dynamic =
+  "force-dynamic";
 
 type RawAdminSlot = {
   id: string;
@@ -36,17 +39,23 @@ type RawAdminSlot = {
 };
 
 export default async function AdminPage() {
-  const supabase = await createClient();
+  const supabase =
+    await createClient();
 
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } =
+    await supabase.auth.getUser();
 
   if (!user) {
     redirect("/login");
   }
 
   const today = getTodayKST();
+
+  // ============================================================
+  // 일정
+  // ============================================================
 
   const {
     data: rawSlots,
@@ -82,26 +91,36 @@ export default async function AdminPage() {
       slot.bookings ?? []
     ).filter(
       (booking) =>
-        booking.status === "confirmed"
+        booking.status ===
+        "confirmed"
     ).length;
 
     return {
       id: slot.id,
       owner_id: slot.owner_id,
       date: slot.date,
-      start_time: slot.start_time,
+      start_time:
+        slot.start_time,
       end_time: slot.end_time,
       title: slot.title,
-      meeting_type: slot.meeting_type,
-      description: slot.description,
-      location_text: slot.location_text,
-      max_guests: slot.max_guests,
+      meeting_type:
+        slot.meeting_type,
+      description:
+        slot.description,
+      location_text:
+        slot.location_text,
+      max_guests:
+        slot.max_guests,
       is_active: slot.is_active,
-      created_at: slot.created_at,
-      updated_at: slot.updated_at,
-      booking_count: confirmedCount,
+      created_at:
+        slot.created_at,
+      updated_at:
+        slot.updated_at,
+      booking_count:
+        confirmedCount,
       remaining: Math.max(
-        slot.max_guests - confirmedCount,
+        slot.max_guests -
+          confirmedCount,
         0
       ),
       is_full:
@@ -109,6 +128,10 @@ export default async function AdminPage() {
         slot.max_guests,
     };
   });
+
+  // ============================================================
+  // 예약
+  // ============================================================
 
   const slotIds = slots.map(
     (slot) => slot.id
@@ -146,27 +169,71 @@ export default async function AdminPage() {
     }
 
     bookings =
-      (bookingRows as Booking[]) ?? [];
+      (bookingRows as Booking[]) ??
+      [];
   }
 
+  // ============================================================
+  // 날짜 제안
+  // ============================================================
+
+  const {
+    data: proposalRows,
+    error: proposalsError,
+  } = await supabase
+    .from("date_proposals")
+    .select("*")
+    .order("created_at", {
+      ascending: false,
+    });
+
+  if (proposalsError) {
+    console.error(
+      "AdminPage proposals error:",
+      proposalsError
+    );
+  }
+
+  const proposals: DateProposal[] =
+    (proposalRows as DateProposal[]) ??
+    [];
+
+  // ============================================================
+  // 화면용 데이터
+  // ============================================================
+
   const siteUrl =
-    process.env.NEXT_PUBLIC_SITE_URL ??
+    process.env
+      .NEXT_PUBLIC_SITE_URL ??
     "https://catch-catchbo.vercel.app";
 
-  const bookUrl = `${siteUrl}/book`;
+  const bookUrl =
+    `${siteUrl}/book`;
 
-  const activeSlots = slots.filter(
-    (slot) => slot.is_active
-  );
+  const activeSlots =
+    slots.filter(
+      (slot) =>
+        slot.is_active
+    );
 
-  const inactiveSlots = slots.filter(
-    (slot) => !slot.is_active
-  );
+  const inactiveSlots =
+    slots.filter(
+      (slot) =>
+        !slot.is_active
+    );
 
   const confirmedBookings =
     bookings.filter(
       (booking) =>
-        booking.status === "confirmed"
+        booking.status ===
+        "confirmed"
+    );
+
+  const pendingProposals =
+    proposals.filter(
+      (proposal) =>
+        proposal.status ===
+        "pending"
     );
 
   return (
@@ -190,7 +257,7 @@ export default async function AdminPage() {
       </header>
 
       <div className="px-5 pt-6 flex flex-col gap-8">
-        {/* 요약 카드 */}
+        {/* 요약 */}
         <section className="grid grid-cols-3 gap-3">
           <div className="card p-3 text-center">
             <p className="text-2xl font-bold text-peach-400">
@@ -204,7 +271,9 @@ export default async function AdminPage() {
 
           <div className="card p-3 text-center">
             <p className="text-2xl font-bold text-sage-400">
-              {confirmedBookings.length}
+              {
+                confirmedBookings.length
+              }
             </p>
 
             <p className="text-xs text-warm-gray-400 mt-0.5">
@@ -214,15 +283,13 @@ export default async function AdminPage() {
 
           <div className="card p-3 text-center">
             <p className="text-2xl font-bold text-warm-gray-600">
-              {slots.reduce(
-                (total, slot) =>
-                  total + slot.remaining,
-                0
-              )}
+              {
+                pendingProposals.length
+              }
             </p>
 
             <p className="text-xs text-warm-gray-400 mt-0.5">
-              남은 자리
+              날짜 제안
             </p>
           </div>
         </section>
@@ -232,7 +299,7 @@ export default async function AdminPage() {
           bookUrl={bookUrl}
         />
 
-        {/* Google Calendar 연결 */}
+        {/* Google Calendar */}
         <section className="card p-4">
           <div className="flex flex-col gap-3">
             <div>
@@ -241,7 +308,9 @@ export default async function AdminPage() {
               </h2>
 
               <p className="text-sm text-warm-gray-400 mt-1">
-                예약을 확정하면 내 캘린더에 자동으로 등록해요.
+                예약을 확정하면 내
+                캘린더에 자동으로
+                등록해요.
               </p>
             </div>
 
@@ -249,9 +318,33 @@ export default async function AdminPage() {
               href="/api/auth/google"
               className="btn-primary w-full text-center"
             >
-              Google Calendar 연결하기
+              Google Calendar
+              연결하기
             </a>
           </div>
+        </section>
+
+        {/* 날짜 제안 */}
+        <section>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-semibold text-warm-gray-700">
+              💌 날짜 제안
+            </h2>
+
+            {pendingProposals.length >
+              0 && (
+              <span className="text-xs font-medium bg-amber-50 text-amber-600 rounded-full px-2.5 py-1">
+                {
+                  pendingProposals.length
+                }
+                건
+              </span>
+            )}
+          </div>
+
+          <ProposalList
+            proposals={proposals}
+          />
         </section>
 
         {/* 일정 */}
@@ -276,11 +369,13 @@ export default async function AdminPage() {
               </p>
 
               <p className="text-warm-gray-500 font-medium">
-                아직 열어둔 날이 없어요
+                아직 열어둔 날이
+                없어요
               </p>
 
               <p className="text-sm text-warm-gray-400 mt-1">
-                가능한 날짜와 시간을 등록해보세요!
+                가능한 날짜와 시간을
+                등록해보세요!
               </p>
 
               <Link
@@ -301,7 +396,8 @@ export default async function AdminPage() {
                 )
               )}
 
-              {inactiveSlots.length > 0 && (
+              {inactiveSlots.length >
+                0 && (
                 <>
                   <p className="text-xs text-warm-gray-400 mt-2">
                     비활성 일정
@@ -310,8 +406,12 @@ export default async function AdminPage() {
                   {inactiveSlots.map(
                     (slot) => (
                       <AdminSlotCard
-                        key={slot.id}
-                        slot={slot}
+                        key={
+                          slot.id
+                        }
+                        slot={
+                          slot
+                        }
                       />
                     )
                   )}
