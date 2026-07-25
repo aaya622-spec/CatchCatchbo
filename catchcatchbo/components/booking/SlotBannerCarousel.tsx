@@ -100,12 +100,30 @@ export default function SlotBannerCarousel({
 
           {/* 텍스트 */}
           <div
-            className={`absolute inset-y-0 left-0 z-10 flex flex-col justify-center px-5 max-w-[65%] ${
-              isLightText
-                ? "text-white"
-                : "text-warm-gray-800"
-            }`}
-          >
+            <div
+  className={`absolute left-10 top-6 z-10 flex flex-col max-w-[62%] ${
+    isLightText
+      ? "text-white"
+      : "text-warm-gray-800"
+  }`}
+>
+  <p className="text-[12px] font-medium opacity-70 leading-none">
+    {getMeetingTypeLabel(
+      currentSlot.meeting_type
+    )}
+  </p>
+
+  <p className="text-[18px] font-bold leading-[1.25] mt-3">
+    {currentSlot.title ??
+      "이번엔 이날 만날래요?"}
+  </p>
+
+  <p className="text-[12px] opacity-70 leading-none mt-3">
+    {formatKoreanDate(
+      currentSlot.date
+    )}
+  </p>
+</div>
             <p className="text-[11px] font-medium opacity-70 mb-1">
               {getMeetingTypeLabel(
                 currentSlot.meeting_type
