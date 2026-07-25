@@ -1,17 +1,9 @@
 "use server";
 
-import {
-  revalidatePath,
-} from "next/cache";
-import {
-  redirect,
-} from "next/navigation";
-import {
-  randomUUID,
-} from "crypto";
-import {
-  createClient,
-} from "@/lib/supabase/server";
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { randomUUID } from "crypto";
+import { createClient } from "@/lib/supabase/server";
 import {
   LOCATION_PRESETS,
   MEETING_TYPES,
@@ -22,7 +14,7 @@ import type {
 } from "@/lib/types";
 
 // ============================================================
-// 공통
+// 장소 최종값
 // ============================================================
 
 function resolveLocationText(
@@ -30,43 +22,36 @@ function resolveLocationText(
   custom: string
 ): string {
   if (preset === "custom") {
-    const trimmed =
-      custom.trim();
+    const trimmed = custom.trim();
 
-    return (
-      trimmed ||
-      "장소 미정"
-    );
+    return trimmed || "장소 미정";
   }
 
   return (
     LOCATION_PRESETS.find(
       (item) =>
-        item.value ===
-        preset
-    )?.value ??
-    "tbd"
+        item.value === preset
+    )?.value ?? "tbd"
   );
 }
+
+// ============================================================
+// 약속 유형 최종값
+// ============================================================
 
 function resolveMeetingType(
   preset: string,
   custom: string
 ): string {
-  if (
-    preset ===
-    "custom"
-  ) {
+  if (preset === "custom") {
     return custom.trim();
   }
 
   const selectedPreset =
     MEETING_TYPES.find(
       (item) =>
-        item.value ===
-          preset &&
-        item.value !==
-          "custom"
+        item.value === preset &&
+        item.value !== "custom"
     );
 
   return (
@@ -74,6 +59,10 @@ function resolveMeetingType(
     preset.trim()
   );
 }
+
+// ============================================================
+// FormData 변환
+// ============================================================
 
 function getSlotFormData(
   formData: FormData
@@ -97,6 +86,13 @@ function getSlotFormData(
       meetingTypePreset,
       meetingTypeCustom
     );
+
+  const imageTextColor =
+    formData.get(
+      "image_text_color"
+    ) === "light"
+      ? "light"
+      : "dark";
 
   return {
     date:
@@ -157,8 +153,10 @@ function getSlotFormData(
         formData.get(
           "image_position"
         ) as string
-      )?.trim() ||
-      "center",
+      )?.trim() || "center",
+
+    image_text_color:
+      imageTextColor,
 
     max_guests:
       parseInt(
@@ -169,6 +167,10 @@ function getSlotFormData(
       ) || 1,
   };
 }
+
+// ============================================================
+// 입력값 검사
+// ============================================================
 
 function validateSlotForm(
   data: SlotFormData
@@ -229,9 +231,7 @@ async function uploadSlotImage(
   error: string | null;
 }> {
   const file =
-    formData.get(
-      "slot_image"
-    );
+    formData.get("slot_image");
 
   if (
     !(file instanceof File) ||
@@ -320,8 +320,7 @@ async function uploadSlotImage(
 
   return {
     url:
-      publicUrlData
-        .publicUrl,
+      publicUrlData.publicUrl,
     error: null,
   };
 }
@@ -385,9 +384,7 @@ export async function createSlot(
       user.id
     );
 
-  if (
-    imageUploadError
-  ) {
+  if (imageUploadError) {
     return {
       success: false,
       error:
@@ -439,11 +436,12 @@ export async function createSlot(
         uploadedUrl,
 
       image_position:
-        data.image_position ||
-        "center",
+        data.image_position,
 
-      max_guests:
-        1,
+      image_text_color:
+        data.image_text_color,
+
+      max_guests: 1,
 
       is_active:
         true,
@@ -470,13 +468,12 @@ export async function createSlot(
   revalidatePath(
     "/admin"
   );
+
   revalidatePath(
     "/book"
   );
 
-  redirect(
-    "/admin"
-  );
+  redirect("/admin");
 }
 
 // ============================================================
@@ -525,9 +522,7 @@ export async function updateSlot(
       data
     );
 
-  if (
-    validationError
-  ) {
+  if (validationError) {
     return {
       success: false,
       error:
@@ -545,9 +540,7 @@ export async function updateSlot(
       user.id
     );
 
-  if (
-    imageUploadError
-  ) {
+  if (imageUploadError) {
     return {
       success: false,
       error:
@@ -599,11 +592,12 @@ export async function updateSlot(
           finalImageUrl,
 
         image_position:
-          data.image_position ||
-          "center",
+          data.image_position,
 
-        max_guests:
-          1,
+        image_text_color:
+          data.image_text_color,
+
+        max_guests: 1,
       })
       .eq(
         "id",
@@ -630,13 +624,12 @@ export async function updateSlot(
   revalidatePath(
     "/admin"
   );
+
   revalidatePath(
     "/book"
   );
 
-  redirect(
-    "/admin"
-  );
+  redirect("/admin");
 }
 
 // ============================================================
@@ -705,6 +698,7 @@ export async function deleteOrDeactivateSlot(
   revalidatePath(
     "/admin"
   );
+
   revalidatePath(
     "/book"
   );
@@ -784,6 +778,7 @@ export async function toggleSlotActive(
   revalidatePath(
     "/admin"
   );
+
   revalidatePath(
     "/book"
   );
