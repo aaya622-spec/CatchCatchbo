@@ -375,7 +375,7 @@ export async function acceptProposal(
         canceled_at: null,
       });
 
-  if (bookingError) {
+ if (bookingError) {
   console.error(
     "Proposal booking create error:",
     bookingError
@@ -388,8 +388,7 @@ export async function acceptProposal(
 
   return {
     success: false,
-    error:
-      "예약 생성에 실패했어요.",
+    error: `예약 생성 실패: ${bookingError.message} / code: ${bookingError.code}`,
   };
 }
 
