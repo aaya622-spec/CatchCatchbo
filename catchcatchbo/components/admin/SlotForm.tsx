@@ -174,6 +174,17 @@ export default function SlotForm({
       locationCustom.trim()
     );
 
+    /*
+     * 기존 서버 로직 호환용.
+     * 관리자 화면에서는 최대 인원을 더 이상 받지 않지만,
+     * available_slots.max_guests 컬럼과 기존 로직이
+     * 아직 남아 있으므로 임시로 1을 전달합니다.
+     */
+    formData.set(
+      "max_guests",
+      "1"
+    );
+
     startTransition(async () => {
       const result = isEdit
         ? await updateSlot(
@@ -338,40 +349,6 @@ export default function SlotForm({
             className="input-base mt-1"
           />
         )}
-      </div>
-
-      {/* 최대 인원 */}
-      <div className="flex flex-col gap-1.5">
-        <label
-          htmlFor="max_guests"
-          className="text-sm font-medium text-warm-gray-700"
-        >
-          최대 예약 인원
-        </label>
-
-        <select
-          id="max_guests"
-          name="max_guests"
-          defaultValue={
-            slot?.max_guests ?? 1
-          }
-          className="input-base"
-        >
-          {Array.from(
-            {
-              length: 10,
-            },
-            (_, index) =>
-              index + 1
-          ).map((number) => (
-            <option
-              key={number}
-              value={number}
-            >
-              {number}명
-            </option>
-          ))}
-        </select>
       </div>
 
       {/* 일정 이름 */}
