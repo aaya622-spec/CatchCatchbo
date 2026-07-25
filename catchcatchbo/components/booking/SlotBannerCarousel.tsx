@@ -63,7 +63,7 @@ export default function SlotBannerCarousel({
     };
   }, [bannerSlots.length]);
 
-  // 이미지가 있는 일정이 없으면 배너 숨김
+  // 이미지가 있는 일정이 없으면 숨김
   if (
     bannerSlots.length === 0
   ) {
@@ -85,11 +85,12 @@ export default function SlotBannerCarousel({
         href={`/book/${currentSlot.id}`}
         className="block"
       >
-        <div className="relative w-full aspect-[4/1] overflow-hidden rounded-2xl bg-cream-200">
-          {/* ================================================ */}
-          {/* 대표 이미지 */}
-          {/* ================================================ */}
+        {/* ================================================== */}
+        {/* 배너 */}
+        {/* ================================================== */}
 
+        <div className="relative w-full aspect-[4/1] overflow-hidden rounded-2xl bg-cream-200">
+          {/* 이미지 */}
           <img
             src={
               currentSlot.image_url!
@@ -106,33 +107,33 @@ export default function SlotBannerCarousel({
             }}
           />
 
-          {/* ================================================ */}
+          {/* ================================================== */}
           {/* 텍스트 */}
-          {/* 딤드 없음 */}
-          {/* ================================================ */}
+          {/* 세로 중앙 정렬 — 화면 크기가 달라도 잘리지 않음 */}
+          {/* ================================================== */}
 
           <div
-            className={`absolute left-[26px] top-[21px] z-10 flex flex-col max-w-[58%] ${
+            className={`absolute left-[28px] top-1/2 -translate-y-1/2 z-10 flex flex-col w-[55%] ${
               isLightText
                 ? "text-white"
                 : "text-warm-gray-800"
             }`}
           >
             {/* 약속 유형 */}
-            <p className="text-[12px] leading-none font-medium opacity-65">
+            <p className="text-[11px] leading-[1] font-medium opacity-60">
               {getMeetingTypeLabel(
                 currentSlot.meeting_type
               )}
             </p>
 
             {/* 약속 제목 */}
-            <p className="mt-[10px] text-[18px] leading-[1.2] font-bold tracking-[-0.02em]">
+            <p className="mt-[8px] text-[17px] leading-[1.2] font-bold tracking-[-0.02em] line-clamp-2">
               {currentSlot.title ??
                 "이번엔 이날 만날래요?"}
             </p>
 
             {/* 날짜 */}
-            <p className="mt-[10px] text-[12px] leading-none font-medium opacity-60">
+            <p className="mt-[8px] text-[11px] leading-[1] font-medium opacity-60">
               {formatKoreanDate(
                 currentSlot.date
               )}
@@ -141,9 +142,9 @@ export default function SlotBannerCarousel({
         </div>
       </Link>
 
-      {/* ================================================ */}
+      {/* ================================================== */}
       {/* 페이지 인디케이터 */}
-      {/* ================================================ */}
+      {/* ================================================== */}
 
       {bannerSlots.length >
         1 && (
