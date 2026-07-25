@@ -83,6 +83,8 @@ function BookingRow({
 
 ${confirmedBooking.guest_name}아, 약속 확정됐어! 🎉
 
+💬 ${confirmedBooking.booking_title}
+👥 ${confirmedBooking.guest_count}명
 📅 ${formatKoreanDate(confirmedSlot.date)}
 🕐 ${formatTimeRange(
       confirmedSlot.start_time,
@@ -158,18 +160,10 @@ ${confirmedBooking.guest_name}아, 약속 확정됐어! 🎉
         return;
       }
 
-      /*
-       * 예약 확정이 완료된 뒤 공유창을 실행합니다.
-       * 공유창을 닫아도 예약 확정은 취소되지 않습니다.
-       */
       await shareConfirmedBooking(
         result.data.booking
       );
 
-      /*
-       * 서버에서 변경된 최신 예약 상태를
-       * 관리자 화면에 즉시 반영합니다.
-       */
       router.refresh();
     });
   }
@@ -192,11 +186,6 @@ ${confirmedBooking.guest_name}아, 약속 확정됐어! 🎉
       }
 
       setShowCancelConfirm(false);
-
-      /*
-       * 거절 또는 취소된 예약을
-       * 관리자 화면에 즉시 반영합니다.
-       */
       router.refresh();
     });
   }
@@ -231,10 +220,25 @@ ${confirmedBooking.guest_name}아, 약속 확정됐어! 🎉
         />
       </div>
 
+      {/* 신청한 약속 */}
+      <div>
+        <p className="text-xs text-warm-gray-400 mb-1">
+          약속 이름
+        </p>
+
+        <p className="font-semibold text-warm-gray-800 leading-snug">
+          {booking.booking_title}
+        </p>
+
+        <p className="text-sm text-warm-gray-500 mt-1">
+          👥 {booking.guest_count}명
+        </p>
+      </div>
+
       {/* 일정 정보 */}
       {slot && (
         <div className="bg-cream-100 rounded-xl px-3 py-2 text-sm text-warm-gray-600">
-          <p>
+          <p className="font-medium">
             {formatKoreanDate(slot.date)}
           </p>
 
@@ -298,9 +302,9 @@ ${confirmedBooking.guest_name}아, 약속 확정됐어! 🎉
               {isPending
                 ? "처리 중…"
                 : booking.status ===
-                  "pending"
-                ? "예약 거절"
-                : "예약 취소"}
+                    "pending"
+                  ? "예약 거절"
+                  : "예약 취소"}
             </button>
           </div>
         </div>
@@ -403,7 +407,6 @@ export default function BookingList({
 
   return (
     <div className="flex flex-col gap-6">
-      {/* 확정 대기 */}
       {pending.length > 0 && (
         <section>
           <h3 className="text-sm font-semibold text-amber-600 mb-3">
@@ -421,7 +424,6 @@ export default function BookingList({
         </section>
       )}
 
-      {/* 확정된 예약 */}
       {confirmed.length > 0 && (
         <section>
           <h3 className="text-sm font-semibold text-warm-gray-500 mb-3">
@@ -442,7 +444,6 @@ export default function BookingList({
         </section>
       )}
 
-      {/* 취소 및 거절 */}
       {canceled.length > 0 && (
         <section>
           <h3 className="text-sm font-semibold text-warm-gray-400 mb-3">
