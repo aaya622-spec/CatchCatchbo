@@ -82,7 +82,7 @@ export default function SlotBannerCarousel({
           />
 
           {/* 왼쪽 텍스트 가독성용 그라데이션 */}
-          <div className="absolute inset-0 bg-gradient-to-r from-black/35 via-black/10 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/10 via-transparent to-transparent" />
 
           <div className="absolute inset-0 flex flex-col justify-center px-5">
             <p className="text-[11px] font-medium text-white/80 mb-1">
