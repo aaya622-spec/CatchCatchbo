@@ -16,12 +16,17 @@ import type {
 
 export const dynamic = "force-dynamic";
 
+// ============================================================
+// Supabase에서 가져오는 관리자 일정 타입
+// ============================================================
+
 type RawAdminSlot = {
   id: string;
   owner_id: string;
   date: string;
   start_time: string;
   end_time: string;
+
   title: string | null;
   meeting_type: string;
   description: string | null;
@@ -29,9 +34,11 @@ type RawAdminSlot = {
 
   image_url: string | null;
   image_position: string | null;
+  image_text_color: "dark" | "light";
 
   max_guests: number;
   is_active: boolean;
+
   created_at: string;
   updated_at: string;
 
@@ -42,8 +49,13 @@ type RawAdminSlot = {
     | null;
 };
 
+// ============================================================
+// 관리자 페이지
+// ============================================================
+
 export default async function AdminPage() {
-  const supabase = await createClient();
+  const supabase =
+    await createClient();
 
   const {
     data: { user },
@@ -56,7 +68,7 @@ export default async function AdminPage() {
   const today = getTodayKST();
 
   // ============================================================
-  // 일정
+  // 일정 조회
   // ============================================================
 
   const {
@@ -86,6 +98,10 @@ export default async function AdminPage() {
     );
   }
 
+  // ============================================================
+  // SlotWithCount 형태로 변환
+  // ============================================================
+
   const slots: SlotWithCount[] = (
     (rawSlots ?? []) as RawAdminSlot[]
   ).map((slot) => {
@@ -98,43 +114,77 @@ export default async function AdminPage() {
 
     return {
       id: slot.id,
+
       owner_id: slot.owner_id,
+
       date: slot.date,
-      start_time: slot.start_time,
-      end_time: slot.end_time,
-      title: slot.title,
-      meeting_type: slot.meeting_type,
-      description: slot.description,
-      location_text: slot.location_text,
 
-      image_url: slot.image_url ?? null,
+      start_time:
+        slot.start_time,
+
+      end_time:
+        slot.end_time,
+
+      title:
+        slot.title,
+
+      meeting_type:
+        slot.meeting_type,
+
+      description:
+        slot.description,
+
+      location_text:
+        slot.location_text,
+
+      // 이미지
+      image_url:
+        slot.image_url ?? null,
+
       image_position:
-        slot.image_position ?? "center",
+        slot.image_position ??
+        "center",
 
-      max_guests: slot.max_guests,
-      is_active: slot.is_active,
-      created_at: slot.created_at,
-      updated_at: slot.updated_at,
+      image_text_color:
+        slot.image_text_color ??
+        "dark",
 
-      booking_count: confirmedCount,
+      // 기존 내부 예약 인원 로직
+      max_guests:
+        slot.max_guests,
+
+      is_active:
+        slot.is_active,
+
+      created_at:
+        slot.created_at,
+
+      updated_at:
+        slot.updated_at,
+
+      booking_count:
+        confirmedCount,
 
       remaining: Math.max(
-        slot.max_guests - confirmedCount,
+        slot.max_guests -
+          confirmedCount,
         0
       ),
 
       is_full:
-        confirmedCount >= slot.max_guests,
+        confirmedCount >=
+        slot.max_guests,
     };
   });
 
   // ============================================================
-  // 예약
+  // 예약 조회
   // ============================================================
 
-  const slotIds = slots.map(
-    (slot) => slot.id
-  );
+  const slotIds =
+    slots.map(
+      (slot) => slot.id
+    );
 
   let bookings: Booking[] = [];
 
@@ -152,15 +202,19 @@ export default async function AdminPage() {
           end_time,
           title,
           location_text,
-          meeting_type,
-          image_url,
-          image_position
+          meeting_type
         )
       `)
-      .in("slot_id", slotIds)
-      .order("created_at", {
-        ascending: false,
-      });
+      .in(
+        "slot_id",
+        slotIds
+      )
+      .order(
+        "created_at",
+        {
+          ascending: false,
+        }
+      );
 
     if (bookingsError) {
       console.error(
@@ -170,7 +224,8 @@ export default async function AdminPage() {
     }
 
     bookings =
-      (bookingRows as Booking[]) ?? [];
+      (bookingRows as Booking[]) ??
+      [];
   }
 
   // ============================================================
@@ -183,9 +238,12 @@ export default async function AdminPage() {
   } = await supabase
     .from("date_proposals")
     .select("*")
-    .order("created_at", {
-      ascending: false,
-    });
+    .order(
+      "created_at",
+      {
+        ascending: false,
+      }
+    );
 
   if (proposalsError) {
     console.error(
@@ -195,37 +253,50 @@ export default async function AdminPage() {
   }
 
   const proposals: DateProposal[] =
-    (proposalRows as DateProposal[]) ?? [];
+    (proposalRows as DateProposal[]) ??
+    [];
 
   // ============================================================
   // 화면용 데이터
   // ============================================================
 
   const siteUrl =
-    process.env.NEXT_PUBLIC_SITE_URL ??
+    process.env
+      .NEXT_PUBLIC_SITE_URL ??
     "https://catch-catchbo.vercel.app";
 
-  const bookUrl = `${siteUrl}/book`;
+  const bookUrl =
+    `${siteUrl}/book`;
 
-  const activeSlots = slots.filter(
-    (slot) => slot.is_active
-  );
+  const activeSlots =
+    slots.filter(
+      (slot) =>
+        slot.is_active
+    );
 
-  const inactiveSlots = slots.filter(
-    (slot) => !slot.is_active
-  );
+  const inactiveSlots =
+    slots.filter(
+      (slot) =>
+        !slot.is_active
+    );
 
   const confirmedBookings =
     bookings.filter(
       (booking) =>
-        booking.status === "confirmed"
+        booking.status ===
+        "confirmed"
     );
 
   const pendingProposals =
     proposals.filter(
       (proposal) =>
-        proposal.status === "pending"
+        proposal.status ===
+        "pending"
     );
+
+  // ============================================================
+  // 화면
+  // ============================================================
 
   return (
     <div className="min-h-screen pb-20">
@@ -248,11 +319,16 @@ export default async function AdminPage() {
       </header>
 
       <div className="px-5 pt-6 flex flex-col gap-8">
-        {/* 요약 */}
+        {/* ================================================== */}
+        {/* 요약 카드 */}
+        {/* ================================================== */}
+
         <section className="grid grid-cols-3 gap-3">
           <div className="card p-3 text-center">
             <p className="text-2xl font-bold text-peach-400">
-              {activeSlots.length}
+              {
+                activeSlots.length
+              }
             </p>
 
             <p className="text-xs text-warm-gray-400 mt-0.5">
@@ -262,7 +338,9 @@ export default async function AdminPage() {
 
           <div className="card p-3 text-center">
             <p className="text-2xl font-bold text-sage-400">
-              {confirmedBookings.length}
+              {
+                confirmedBookings.length
+              }
             </p>
 
             <p className="text-xs text-warm-gray-400 mt-0.5">
@@ -272,7 +350,9 @@ export default async function AdminPage() {
 
           <div className="card p-3 text-center">
             <p className="text-2xl font-bold text-warm-gray-600">
-              {pendingProposals.length}
+              {
+                pendingProposals.length
+              }
             </p>
 
             <p className="text-xs text-warm-gray-400 mt-0.5">
@@ -281,12 +361,18 @@ export default async function AdminPage() {
           </div>
         </section>
 
+        {/* ================================================== */}
         {/* 공유 링크 */}
+        {/* ================================================== */}
+
         <ShareSection
           bookUrl={bookUrl}
         />
 
+        {/* ================================================== */}
         {/* Google Calendar */}
+        {/* ================================================== */}
+
         <section className="card p-4">
           <div className="flex flex-col gap-3">
             <div>
@@ -295,8 +381,9 @@ export default async function AdminPage() {
               </h2>
 
               <p className="text-sm text-warm-gray-400 mt-1">
-                예약을 확정하면 내 캘린더에
-                자동으로 등록해요.
+                예약을 확정하면
+                내 캘린더에 자동으로
+                등록해요.
               </p>
             </div>
 
@@ -304,31 +391,44 @@ export default async function AdminPage() {
               href="/api/auth/google"
               className="btn-primary w-full text-center"
             >
-              Google Calendar 연결하기
+              Google Calendar
+              연결하기
             </a>
           </div>
         </section>
 
+        {/* ================================================== */}
         {/* 날짜 제안 */}
+        {/* ================================================== */}
+
         <section>
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold text-warm-gray-700">
               💌 날짜 제안
             </h2>
 
-            {pendingProposals.length > 0 && (
+            {pendingProposals.length >
+              0 && (
               <span className="text-xs font-medium bg-amber-50 text-amber-600 rounded-full px-2.5 py-1">
-                {pendingProposals.length}건
+                {
+                  pendingProposals.length
+                }
+                건
               </span>
             )}
           </div>
 
           <ProposalList
-            proposals={proposals}
+            proposals={
+              proposals
+            }
           />
         </section>
 
+        {/* ================================================== */}
         {/* 일정 */}
+        {/* ================================================== */}
+
         <section>
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold text-warm-gray-700">
@@ -350,12 +450,13 @@ export default async function AdminPage() {
               </p>
 
               <p className="text-warm-gray-500 font-medium">
-                아직 열어둔 날이 없어요
+                아직 열어둔 날이
+                없어요
               </p>
 
               <p className="text-sm text-warm-gray-400 mt-1">
-                가능한 날짜와 시간을
-                등록해보세요!
+                가능한 날짜와
+                시간을 등록해보세요!
               </p>
 
               <Link
@@ -367,16 +468,23 @@ export default async function AdminPage() {
             </div>
           ) : (
             <div className="flex flex-col gap-3">
+              {/* 활성 일정 */}
               {activeSlots.map(
                 (slot) => (
                   <AdminSlotCard
-                    key={slot.id}
-                    slot={slot}
+                    key={
+                      slot.id
+                    }
+                    slot={
+                      slot
+                    }
                   />
                 )
               )}
 
-              {inactiveSlots.length > 0 && (
+              {/* 비활성 일정 */}
+              {inactiveSlots.length >
+                0 && (
                 <>
                   <p className="text-xs text-warm-gray-400 mt-2">
                     비활성 일정
@@ -385,8 +493,12 @@ export default async function AdminPage() {
                   {inactiveSlots.map(
                     (slot) => (
                       <AdminSlotCard
-                        key={slot.id}
-                        slot={slot}
+                        key={
+                          slot.id
+                        }
+                        slot={
+                          slot
+                        }
                       />
                     )
                   )}
@@ -396,14 +508,19 @@ export default async function AdminPage() {
           )}
         </section>
 
+        {/* ================================================== */}
         {/* 예약 현황 */}
+        {/* ================================================== */}
+
         <section>
           <h2 className="font-semibold text-warm-gray-700 mb-4">
             예약 현황
           </h2>
 
           <BookingList
-            bookings={bookings}
+            bookings={
+              bookings
+            }
           />
         </section>
       </div>
