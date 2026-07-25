@@ -333,7 +333,7 @@ export async function acceptProposal(
           proposal.note,
         location_text: "tbd",
         max_guests: 1,
-        is_active: false,
+        is_active: true,
         created_at: now,
         updated_at: now,
       });
