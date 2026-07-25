@@ -33,6 +33,10 @@ export default function SlotBannerCarousel({
     setCurrentIndex,
   ] = useState(0);
 
+  // ============================================================
+  // 자동 롤링
+  // ============================================================
+
   useEffect(() => {
     if (
       bannerSlots.length <= 1
@@ -59,6 +63,7 @@ export default function SlotBannerCarousel({
     };
   }, [bannerSlots.length]);
 
+  // 이미지가 있는 일정이 없으면 배너 숨김
   if (
     bannerSlots.length === 0
   ) {
@@ -81,7 +86,10 @@ export default function SlotBannerCarousel({
         className="block"
       >
         <div className="relative w-full aspect-[4/1] overflow-hidden rounded-2xl bg-cream-200">
-          {/* 이미지 */}
+          {/* ================================================ */}
+          {/* 대표 이미지 */}
+          {/* ================================================ */}
+
           <img
             src={
               currentSlot.image_url!
@@ -98,44 +106,33 @@ export default function SlotBannerCarousel({
             }}
           />
 
+          {/* ================================================ */}
           {/* 텍스트 */}
+          {/* 딤드 없음 */}
+          {/* ================================================ */}
+
           <div
-            <div
-  className={`absolute left-10 top-6 z-10 flex flex-col max-w-[62%] ${
-    isLightText
-      ? "text-white"
-      : "text-warm-gray-800"
-  }`}
->
-  <p className="text-[12px] font-medium opacity-70 leading-none">
-    {getMeetingTypeLabel(
-      currentSlot.meeting_type
-    )}
-  </p>
-
-  <p className="text-[18px] font-bold leading-[1.25] mt-3">
-    {currentSlot.title ??
-      "이번엔 이날 만날래요?"}
-  </p>
-
-  <p className="text-[12px] opacity-70 leading-none mt-3">
-    {formatKoreanDate(
-      currentSlot.date
-    )}
-  </p>
-</div>
-            <p className="text-[11px] font-medium opacity-70 mb-1">
+            className={`absolute left-[26px] top-[21px] z-10 flex flex-col max-w-[58%] ${
+              isLightText
+                ? "text-white"
+                : "text-warm-gray-800"
+            }`}
+          >
+            {/* 약속 유형 */}
+            <p className="text-[12px] leading-none font-medium opacity-65">
               {getMeetingTypeLabel(
                 currentSlot.meeting_type
               )}
             </p>
 
-            <p className="text-base font-bold leading-snug">
+            {/* 약속 제목 */}
+            <p className="mt-[10px] text-[18px] leading-[1.2] font-bold tracking-[-0.02em]">
               {currentSlot.title ??
                 "이번엔 이날 만날래요?"}
             </p>
 
-            <p className="text-[11px] opacity-70 mt-1.5">
+            {/* 날짜 */}
+            <p className="mt-[10px] text-[12px] leading-none font-medium opacity-60">
               {formatKoreanDate(
                 currentSlot.date
               )}
@@ -144,31 +141,39 @@ export default function SlotBannerCarousel({
         </div>
       </Link>
 
+      {/* ================================================ */}
       {/* 페이지 인디케이터 */}
+      {/* ================================================ */}
+
       {bannerSlots.length >
         1 && (
         <div className="flex items-center justify-center gap-1.5 mt-2">
           {bannerSlots.map(
-            (slot, index) => (
-              <button
-                key={slot.id}
-                type="button"
-                aria-label={`배너 ${
-                  index + 1
-                }`}
-                onClick={() =>
-                  setCurrentIndex(
-                    index
-                  )
-                }
-                className={`h-1.5 rounded-full transition-all ${
-                  index ===
-                  currentIndex
-                    ? "w-4 bg-warm-gray-600"
-                    : "w-1.5 bg-warm-gray-300"
-                }`}
-              />
-            )
+            (slot, index) => {
+              const isCurrent =
+                index ===
+                currentIndex;
+
+              return (
+                <button
+                  key={slot.id}
+                  type="button"
+                  aria-label={`배너 ${
+                    index + 1
+                  }`}
+                  onClick={() =>
+                    setCurrentIndex(
+                      index
+                    )
+                  }
+                  className={`h-1.5 rounded-full transition-all ${
+                    isCurrent
+                      ? "w-4 bg-warm-gray-600"
+                      : "w-1.5 bg-warm-gray-300"
+                  }`}
+                />
+              );
+            }
           )}
         </div>
       )}
