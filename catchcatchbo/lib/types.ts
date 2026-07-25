@@ -15,7 +15,8 @@ export interface AvailableSlot {
 
   // 대표 이미지
   image_url: string | null;
-  image_position: string | null;
+  image_position: string;
+  image_text_color: "dark" | "light";
 
   max_guests: number;
   is_active: boolean;
@@ -121,6 +122,7 @@ export interface SlotFormData {
 
   image_url: string;
   image_position: string;
+  image_text_color: "dark" | "light";
 
   max_guests: number;
 }
