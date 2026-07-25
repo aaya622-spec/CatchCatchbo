@@ -1,8 +1,14 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import {
+  useState,
+  useTransition,
+} from "react";
 import { useRouter } from "next/navigation";
-import { Input, Textarea } from "@/components/ui/Input";
+import {
+  Input,
+  Textarea,
+} from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import {
   MEETING_TYPES,
@@ -12,7 +18,9 @@ import {
   createSlot,
   updateSlot,
 } from "@/lib/actions/slots";
-import type { AvailableSlot } from "@/lib/types";
+import type {
+  AvailableSlot,
+} from "@/lib/types";
 
 interface SlotFormProps {
   slot?: AvailableSlot;
@@ -23,12 +31,28 @@ export default function SlotForm({
 }: SlotFormProps) {
   const router = useRouter();
 
-  const [isPending, startTransition] =
-    useTransition();
+  const [
+    isPending,
+    startTransition,
+  ] = useTransition();
 
-  const [error, setError] = useState<
-    string | null
-  >(null);
+  const [error, setError] =
+    useState<string | null>(null);
+
+  const [
+    imagePreview,
+    setImagePreview,
+  ] = useState<string | null>(
+    slot?.image_url ?? null
+  );
+
+  const [
+    imagePosition,
+    setImagePosition,
+  ] = useState(
+    slot?.image_position ??
+      "center"
+  );
 
   const isEdit = !!slot;
 
@@ -36,7 +60,8 @@ export default function SlotForm({
     slot &&
     MEETING_TYPES.find(
       (type) =>
-        type.value === slot.meeting_type &&
+        type.value ===
+          slot.meeting_type &&
         type.value !== "custom"
     )
       ? slot.meeting_type
@@ -48,7 +73,8 @@ export default function SlotForm({
     slot &&
     !MEETING_TYPES.find(
       (type) =>
-        type.value === slot.meeting_type &&
+        type.value ===
+          slot.meeting_type &&
         type.value !== "custom"
     )
       ? slot.meeting_type
@@ -58,7 +84,8 @@ export default function SlotForm({
     slot &&
     LOCATION_PRESETS.find(
       (preset) =>
-        preset.value === slot.location_text &&
+        preset.value ===
+          slot.location_text &&
         preset.value !== "custom"
     )
       ? slot.location_text
@@ -70,7 +97,8 @@ export default function SlotForm({
     slot &&
     !LOCATION_PRESETS.find(
       (preset) =>
-        preset.value === slot.location_text &&
+        preset.value ===
+          slot.location_text &&
         preset.value !== "custom"
     )
       ? slot.location_text
@@ -104,15 +132,16 @@ export default function SlotForm({
     savedLocationCustom
   );
 
-  const today = new Intl.DateTimeFormat(
-    "en-CA",
-    {
-      timeZone: "Asia/Seoul",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    }
-  ).format(new Date());
+  const today =
+    new Intl.DateTimeFormat(
+      "en-CA",
+      {
+        timeZone: "Asia/Seoul",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }
+    ).format(new Date());
 
   function handleMeetingTypeSelect(
     value: string
@@ -124,6 +153,47 @@ export default function SlotForm({
     }
   }
 
+  function handleImageChange(
+    event: React.ChangeEvent<HTMLInputElement>
+  ) {
+    const file =
+      event.target.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    if (
+      !file.type.startsWith(
+        "image/"
+      )
+    ) {
+      setError(
+        "이미지 파일만 업로드할 수 있어요."
+      );
+      event.target.value = "";
+      return;
+    }
+
+    if (
+      file.size >
+      5 * 1024 * 1024
+    ) {
+      setError(
+        "이미지는 5MB 이하로 올려주세요."
+      );
+      event.target.value = "";
+      return;
+    }
+
+    setError(null);
+
+    const previewUrl =
+      URL.createObjectURL(file);
+
+    setImagePreview(previewUrl);
+  }
+
   function handleSubmit(
     event: React.FormEvent<HTMLFormElement>
   ) {
@@ -131,7 +201,8 @@ export default function SlotForm({
     setError(null);
 
     if (
-      meetingTypePreset === "custom" &&
+      meetingTypePreset ===
+        "custom" &&
       !meetingTypeCustom.trim()
     ) {
       setError(
@@ -141,7 +212,8 @@ export default function SlotForm({
     }
 
     if (
-      locationPreset === "custom" &&
+      locationPreset ===
+        "custom" &&
       !locationCustom.trim()
     ) {
       setError(
@@ -150,9 +222,10 @@ export default function SlotForm({
       return;
     }
 
-    const formData = new FormData(
-      event.currentTarget
-    );
+    const formData =
+      new FormData(
+        event.currentTarget
+      );
 
     formData.set(
       "meeting_type_preset",
@@ -174,11 +247,19 @@ export default function SlotForm({
       locationCustom.trim()
     );
 
+    formData.set(
+      "image_position",
+      imagePosition
+    );
+
+    formData.set(
+      "current_image_url",
+      slot?.image_url ?? ""
+    );
+
     /*
-     * 기존 서버 로직 호환용.
-     * 관리자 화면에서는 최대 인원을 더 이상 받지 않지만,
-     * available_slots.max_guests 컬럼과 기존 로직이
-     * 아직 남아 있으므로 임시로 1을 전달합니다.
+     * 기존 DB/트리거 호환용.
+     * 관리자에게는 최대 인원 UI를 노출하지 않습니다.
      */
     formData.set(
       "max_guests",
@@ -191,7 +272,9 @@ export default function SlotForm({
             slot.id,
             formData
           )
-        : await createSlot(formData);
+        : await createSlot(
+            formData
+          );
 
       if (
         result &&
@@ -217,7 +300,9 @@ export default function SlotForm({
         type="date"
         required
         min={today}
-        defaultValue={slot?.date ?? ""}
+        defaultValue={
+          slot?.date ?? ""
+        }
       />
 
       {/* 시간 */}
@@ -299,8 +384,8 @@ export default function SlotForm({
         )}
 
         <p className="text-xs text-warm-gray-400">
-          추천 유형을 고르거나 직접
-          입력할 수 있어요.
+          추천 유형을 고르거나
+          직접 입력할 수 있어요.
         </p>
       </div>
 
@@ -314,7 +399,9 @@ export default function SlotForm({
           {LOCATION_PRESETS.map(
             (preset) => (
               <button
-                key={preset.value}
+                key={
+                  preset.value
+                }
                 type="button"
                 onClick={() =>
                   setLocationPreset(
@@ -328,7 +415,9 @@ export default function SlotForm({
                     : "border-warm-gray-200 bg-white text-warm-gray-600"
                 }`}
               >
-                {preset.label}
+                {
+                  preset.label
+                }
               </button>
             )
           )}
@@ -339,7 +428,9 @@ export default function SlotForm({
           <input
             type="text"
             placeholder="장소를 직접 입력해주세요"
-            value={locationCustom}
+            value={
+              locationCustom
+            }
             onChange={(event) =>
               setLocationCustom(
                 event.target.value
@@ -356,12 +447,111 @@ export default function SlotForm({
         label="일정 이름 (선택)"
         name="title"
         type="text"
-        placeholder="예: 7월 셋째 주 저녁"
+        placeholder="예: 한강에서 치맥 먹자!"
         defaultValue={
           slot?.title ?? ""
         }
-        hint="비워두면 날짜와 시간으로 표시돼요"
+        hint="친구에게 보여줄 약속 제목이에요"
       />
+
+      {/* 대표 이미지 */}
+      <div className="flex flex-col gap-2">
+        <label
+          htmlFor="slot_image"
+          className="text-sm font-medium text-warm-gray-700"
+        >
+          대표 이미지 (선택)
+        </label>
+
+        {imagePreview ? (
+          <div className="w-full aspect-[4/1] overflow-hidden rounded-2xl bg-warm-gray-100">
+            <img
+              src={
+                imagePreview
+              }
+              alt="대표 이미지 미리보기"
+              className="w-full h-full object-cover"
+              style={{
+                objectPosition:
+                  imagePosition,
+              }}
+            />
+          </div>
+        ) : (
+          <div className="w-full aspect-[4/1] rounded-2xl bg-cream-100 border border-dashed border-warm-gray-200 flex items-center justify-center">
+            <span className="text-sm text-warm-gray-400">
+              대표 이미지를
+              추가해보세요
+            </span>
+          </div>
+        )}
+
+        <input
+          id="slot_image"
+          name="slot_image"
+          type="file"
+          accept="image/*"
+          onChange={
+            handleImageChange
+          }
+          className="block w-full text-sm text-warm-gray-500 file:mr-3 file:rounded-xl file:border-0 file:bg-peach-100 file:px-4 file:py-2.5 file:text-sm file:font-medium file:text-peach-500"
+        />
+
+        <p className="text-xs text-warm-gray-400">
+          가로형 이미지를
+          권장해요. 최대 5MB
+        </p>
+
+        {/* 이미지 위치 */}
+        {imagePreview && (
+          <div className="flex gap-2 mt-1">
+            {[
+              {
+                value:
+                  "top",
+                label:
+                  "위",
+              },
+              {
+                value:
+                  "center",
+                label:
+                  "가운데",
+              },
+              {
+                value:
+                  "bottom",
+                label:
+                  "아래",
+              },
+            ].map(
+              (item) => (
+                <button
+                  key={
+                    item.value
+                  }
+                  type="button"
+                  onClick={() =>
+                    setImagePosition(
+                      item.value
+                    )
+                  }
+                  className={`flex-1 py-2 rounded-xl border text-xs ${
+                    imagePosition ===
+                    item.value
+                      ? "border-peach-300 bg-peach-100 text-peach-500"
+                      : "border-warm-gray-200 bg-white text-warm-gray-500"
+                  }`}
+                >
+                  {
+                    item.label
+                  }
+                </button>
+              )
+            )}
+          </div>
+        )}
+      </div>
 
       {/* 설명 */}
       <Textarea
@@ -369,11 +559,12 @@ export default function SlotForm({
         name="description"
         placeholder="추가로 전달하고 싶은 내용이 있으면 적어줘요"
         defaultValue={
-          slot?.description ?? ""
+          slot?.description ??
+          ""
         }
       />
 
-      {/* 오류 메시지 */}
+      {/* 오류 */}
       {error && (
         <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-sm text-red-500">
           {error}
@@ -389,7 +580,9 @@ export default function SlotForm({
           onClick={() =>
             router.back()
           }
-          disabled={isPending}
+          disabled={
+            isPending
+          }
         >
           취소
         </Button>
@@ -397,7 +590,9 @@ export default function SlotForm({
         <Button
           type="submit"
           fullWidth
-          loading={isPending}
+          loading={
+            isPending
+          }
         >
           {isEdit
             ? "수정 완료"
