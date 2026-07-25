@@ -20,12 +20,13 @@ interface SlotBannerCarouselProps {
 export default function SlotBannerCarousel({
   slots,
 }: SlotBannerCarouselProps) {
-  const bannerSlots = slots.filter(
-    (slot) =>
-      slot.image_url &&
-      slot.is_active &&
-      !slot.is_full
-  );
+  const bannerSlots =
+    slots.filter(
+      (slot) =>
+        slot.image_url &&
+        slot.is_active &&
+        !slot.is_full
+    );
 
   const [
     currentIndex,
@@ -33,32 +34,45 @@ export default function SlotBannerCarousel({
   ] = useState(0);
 
   useEffect(() => {
-    if (bannerSlots.length <= 1) {
+    if (
+      bannerSlots.length <= 1
+    ) {
       return;
     }
 
-    const timer = window.setInterval(
-      () => {
-        setCurrentIndex(
-          (current) =>
-            (current + 1) %
-            bannerSlots.length
-        );
-      },
-      4500
-    );
+    const timer =
+      window.setInterval(
+        () => {
+          setCurrentIndex(
+            (current) =>
+              (current + 1) %
+              bannerSlots.length
+          );
+        },
+        4500
+      );
 
     return () => {
-      window.clearInterval(timer);
+      window.clearInterval(
+        timer
+      );
     };
   }, [bannerSlots.length]);
 
-  if (bannerSlots.length === 0) {
+  if (
+    bannerSlots.length === 0
+  ) {
     return null;
   }
 
   const currentSlot =
-    bannerSlots[currentIndex];
+    bannerSlots[
+      currentIndex
+    ];
+
+  const isLightText =
+    currentSlot.image_text_color ===
+    "light";
 
   return (
     <section className="mb-7">
@@ -67,8 +81,11 @@ export default function SlotBannerCarousel({
         className="block"
       >
         <div className="relative w-full aspect-[4/1] overflow-hidden rounded-2xl bg-cream-200">
+          {/* 이미지 */}
           <img
-            src={currentSlot.image_url!}
+            src={
+              currentSlot.image_url!
+            }
             alt={
               currentSlot.title ??
               "추천 약속"
@@ -81,22 +98,26 @@ export default function SlotBannerCarousel({
             }}
           />
 
-          {/* 왼쪽 텍스트 가독성용 그라데이션 */}
-          <div className="absolute inset-0 bg-gradient-to-r from-black/10 via-transparent to-transparent" />
-
-          <div className="absolute inset-0 flex flex-col justify-center px-5">
-            <p className="text-[11px] font-medium text-white/80 mb-1">
+          {/* 텍스트 */}
+          <div
+            className={`absolute inset-y-0 left-0 z-10 flex flex-col justify-center px-5 max-w-[65%] ${
+              isLightText
+                ? "text-white"
+                : "text-warm-gray-800"
+            }`}
+          >
+            <p className="text-[11px] font-medium opacity-70 mb-1">
               {getMeetingTypeLabel(
                 currentSlot.meeting_type
               )}
             </p>
 
-            <p className="text-base font-bold text-white leading-snug max-w-[65%]">
+            <p className="text-base font-bold leading-snug">
               {currentSlot.title ??
                 "이번엔 이날 만날래요?"}
             </p>
 
-            <p className="text-[11px] text-white/80 mt-1">
+            <p className="text-[11px] opacity-70 mt-1.5">
               {formatKoreanDate(
                 currentSlot.date
               )}
@@ -105,8 +126,9 @@ export default function SlotBannerCarousel({
         </div>
       </Link>
 
-      {/* 페이지 점 */}
-      {bannerSlots.length > 1 && (
+      {/* 페이지 인디케이터 */}
+      {bannerSlots.length >
+        1 && (
         <div className="flex items-center justify-center gap-1.5 mt-2">
           {bannerSlots.map(
             (slot, index) => (
@@ -117,7 +139,9 @@ export default function SlotBannerCarousel({
                   index + 1
                 }`}
                 onClick={() =>
-                  setCurrentIndex(index)
+                  setCurrentIndex(
+                    index
+                  )
                 }
                 className={`h-1.5 rounded-full transition-all ${
                   index ===
