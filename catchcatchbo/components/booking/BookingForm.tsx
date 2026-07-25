@@ -218,102 +218,126 @@ export default function BookingForm({
 
   return (
     <form
-      onSubmit={handleSubmit}
-      className="flex flex-col gap-5 px-5 pb-10"
+  onSubmit={handleSubmit}
+  className="flex flex-col gap-5 px-5 pb-10"
+>
+  {/* 이름 */}
+  <Input
+    label="이름"
+    name="guest_name"
+    type="text"
+    required
+    placeholder="홍길동"
+    maxLength={20}
+    autoComplete="name"
+  />
+
+  {/* 연락처 */}
+  <Input
+    label="연락처 또는 카카오톡 이름 (선택)"
+    name="guest_contact"
+    type="text"
+    placeholder="카카오톡 이름이나 전화번호"
+    hint="확정 안내를 받을 수 있게 남겨주세요"
+  />
+
+  {/* 약속 이름 */}
+  <Input
+    label="약속 이름"
+    name="booking_title"
+    type="text"
+    required
+    placeholder="예: 성수에서 전시 보고 저녁 먹기"
+    maxLength={40}
+  />
+
+  {/* 인원 */}
+  <div className="flex flex-col gap-1.5">
+    <label
+      htmlFor="guest_count"
+      className="text-sm font-medium text-warm-gray-700"
     >
-      {/* 이름 */}
-      <Input
-        label="이름"
-        name="guest_name"
-        type="text"
-        required
-        placeholder="홍길동"
-        maxLength={20}
-        autoComplete="name"
-      />
+      몇 명이 함께 와요?
+    </label>
 
-      {/* 약속 유형 선택 */}
-      <div className="flex flex-col gap-1.5">
-        <label className="text-sm font-medium text-warm-gray-700">
-          어떤 약속이에요?
+    <select
+      id="guest_count"
+      name="guest_count"
+      defaultValue="1"
+      required
+      className="w-full rounded-2xl border border-warm-gray-200 bg-white px-4 py-3.5 text-sm text-warm-gray-700 outline-none transition-colors focus:border-peach-300"
+    >
+      <option value="1">1명</option>
+      <option value="2">2명</option>
+      <option value="3">3명</option>
+      <option value="4">4명</option>
+    </select>
+  </div>
+
+  {/* 약속 유형 선택 */}
+  <div className="flex flex-col gap-1.5">
+    <label className="text-sm font-medium text-warm-gray-700">
+      어떤 약속이에요?
+    </label>
+
+    <div className="grid grid-cols-3 gap-2">
+      {MEETING_TYPES.map((type) => (
+        <label
+          key={type.value}
+          className="relative cursor-pointer"
+        >
+          <input
+            type="radio"
+            name="meeting_type"
+            value={type.value}
+            checked={selectedMeetingType === type.value}
+            onChange={() =>
+              setSelectedMeetingType(type.value)
+            }
+            className="sr-only"
+            required
+          />
+
+          <div
+            className={`flex items-center justify-center py-2.5 rounded-xl border text-sm transition-all ${
+              selectedMeetingType === type.value
+                ? "border-peach-300 bg-peach-100 text-peach-500"
+                : "border-warm-gray-200 bg-white text-warm-gray-600"
+            }`}
+          >
+            {type.label}
+          </div>
         </label>
+      ))}
+    </div>
+  </div>
 
-        <div className="grid grid-cols-3 gap-2">
-          {MEETING_TYPES.map(
-            (type) => (
-              <label
-                key={type.value}
-                className="relative cursor-pointer"
-              >
-                <input
-                  type="radio"
-                  name="meeting_type"
-                  value={type.value}
-                  checked={
-                    selectedMeetingType ===
-                    type.value
-                  }
-                  onChange={() =>
-                    setSelectedMeetingType(
-                      type.value
-                    )
-                  }
-                  className="sr-only"
-                  required
-                />
+  {/* 메모 */}
+  <Textarea
+    label="메모 (선택)"
+    name="note"
+    placeholder="하고 싶은 말이 있으면 적어줘요"
+    rows={2}
+  />
 
-                <div
-                  className={`flex items-center justify-center py-2.5 rounded-xl border text-sm transition-all ${
-                    selectedMeetingType ===
-                    type.value
-                      ? "border-peach-300 bg-peach-100 text-peach-500"
-                      : "border-warm-gray-200 bg-white text-warm-gray-600"
-                  }`}
-                >
-                  {type.label}
-                </div>
-              </label>
-            )
-          )}
-        </div>
-      </div>
+  {error && (
+    <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-sm text-red-500">
+      {error}
+    </div>
+  )}
 
-      {/* 연락처 */}
-      <Input
-        label="연락처 또는 카카오톡 이름 (선택)"
-        name="guest_contact"
-        type="text"
-        placeholder="카카오톡 이름이나 전화번호"
-        hint="확정 안내를 받을 수 있게 남겨주세요"
-      />
+  <Button
+    type="submit"
+    fullWidth
+    loading={isPending}
+    size="lg"
+  >
+    {BOOKING_BUTTON_TEXT}
+  </Button>
 
-      {/* 메모 */}
-      <Textarea
-        label="메모 (선택)"
-        name="note"
-        placeholder="하고 싶은 말이 있으면 적어줘요"
-        rows={2}
-      />
-
-      {error && (
-        <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-sm text-red-500">
-          {error}
-        </div>
-      )}
-
-      <Button
-        type="submit"
-        fullWidth
-        loading={isPending}
-        size="lg"
-      >
-        {BOOKING_BUTTON_TEXT}
-      </Button>
-
-      <p className="text-xs text-center text-warm-gray-400">
-        예약 신청 후 관리자가
-        확인하면 확정돼요 😊
-      </p>
-    </form>
+  <p className="text-xs text-center text-warm-gray-400">
+    예약 신청 후 관리자가 확인하면 확정돼요 😊
+  </p>
+</form>
   );
 }
