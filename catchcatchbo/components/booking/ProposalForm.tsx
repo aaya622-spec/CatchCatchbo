@@ -63,7 +63,6 @@ export default function ProposalForm() {
           result.error ??
             "날짜 제안 중 오류가 발생했어요."
         );
-
         return;
       }
 
@@ -103,7 +102,6 @@ export default function ProposalForm() {
       onSubmit={handleSubmit}
       className="flex flex-col gap-5"
     >
-      {/* 이름 */}
       <Input
         label="이름"
         name="guest_name"
@@ -114,7 +112,6 @@ export default function ProposalForm() {
         autoComplete="name"
       />
 
-      {/* 연락처 */}
       <Input
         label="연락처 또는 카카오톡 이름 (선택)"
         name="guest_contact"
@@ -123,7 +120,6 @@ export default function ProposalForm() {
         hint="제안 확인 후 연락할 수 있게 남겨주세요"
       />
 
-      {/* 약속 이름 */}
       <Input
         label="약속 이름"
         name="booking_title"
@@ -133,7 +129,6 @@ export default function ProposalForm() {
         maxLength={40}
       />
 
-      {/* 희망 날짜 */}
       <Input
         label="희망 날짜"
         name="proposed_date"
@@ -142,14 +137,23 @@ export default function ProposalForm() {
         min={today}
       />
 
-      {/* 희망 시간 */}
-      <Input
-        label="희망 시간 (선택)"
-        name="proposed_time"
-        type="time"
-      />
+      {/* 시작 / 종료 시간 */}
+      <div className="grid grid-cols-2 gap-3">
+        <Input
+          label="시작 시간"
+          name="proposed_time"
+          type="time"
+          required
+        />
 
-      {/* 인원 */}
+        <Input
+          label="종료 시간"
+          name="proposed_end_time"
+          type="time"
+          required
+        />
+      </div>
+
       <div className="flex flex-col gap-1.5">
         <label
           htmlFor="guest_count"
@@ -165,22 +169,13 @@ export default function ProposalForm() {
           required
           className="input-base"
         >
-          <option value="1">
-            1명
-          </option>
-          <option value="2">
-            2명
-          </option>
-          <option value="3">
-            3명
-          </option>
-          <option value="4">
-            4명
-          </option>
+          <option value="1">1명</option>
+          <option value="2">2명</option>
+          <option value="3">3명</option>
+          <option value="4">4명</option>
         </select>
       </div>
 
-      {/* 약속 유형 */}
       <div className="flex flex-col gap-1.5">
         <label className="text-sm font-medium text-warm-gray-700">
           어떤 약속이에요?
@@ -226,7 +221,6 @@ export default function ProposalForm() {
         </div>
       </div>
 
-      {/* 메모 */}
       <Textarea
         label="메모 (선택)"
         name="note"
@@ -234,7 +228,6 @@ export default function ProposalForm() {
         rows={3}
       />
 
-      {/* 오류 */}
       {error && (
         <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-sm text-red-500">
           {error}
