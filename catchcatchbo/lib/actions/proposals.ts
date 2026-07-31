@@ -670,7 +670,6 @@ export async function acceptProposal(
     data: {
       proposal:
         acceptedProposal as DateProposal,
-
       booking,
     },
   };
