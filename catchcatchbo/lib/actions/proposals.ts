@@ -30,51 +30,44 @@ import type {
 export async function createProposal(
   formData: FormData
 ): Promise<ActionResult> {
-  const guestName =
-    (
-      formData.get("guest_name") as string
-    )?.trim();
+  const guestName = (
+    formData.get("guest_name") as string
+  )?.trim();
 
   const guestContact =
     (
       formData.get("guest_contact") as string
     )?.trim() || null;
 
-  const bookingTitle =
-    (
-      formData.get("booking_title") as string
-    )?.trim();
+  const bookingTitle = (
+    formData.get("booking_title") as string
+  )?.trim();
 
-  const proposedDate =
-    (
-      formData.get("proposed_date") as string
-    )?.trim();
+  const proposedDate = (
+    formData.get("proposed_date") as string
+  )?.trim();
 
-  const proposedTime =
-    (
-      formData.get("proposed_time") as string
-    )?.trim();
+  const proposedTime = (
+    formData.get("proposed_time") as string
+  )?.trim();
 
-  const proposedEndTime =
-    (
-      formData.get("proposed_end_time") as string
-    )?.trim();
+  const proposedEndTime = (
+    formData.get("proposed_end_time") as string
+  )?.trim();
 
   const guestCount = Number(
     formData.get("guest_count") ?? 1
   );
 
-  const meetingType =
-    (
-      formData.get("meeting_type") as string
-    )?.trim();
+  const meetingType = (
+    formData.get("meeting_type") as string
+  )?.trim();
 
   const note =
     (
       formData.get("note") as string
     )?.trim() || null;
 
-  // 입력값 검증
   if (!guestName) {
     return {
       success: false,
@@ -110,25 +103,17 @@ export async function createProposal(
     };
   }
 
-  if (
-    !proposedTime ||
-    !proposedEndTime
-  ) {
+  if (!proposedTime || !proposedEndTime) {
     return {
       success: false,
-      error:
-        "시작 시간과 종료 시간을 선택해주세요.",
+      error: "시작 시간과 종료 시간을 선택해주세요.",
     };
   }
 
-  if (
-    proposedEndTime <=
-    proposedTime
-  ) {
+  if (proposedEndTime <= proposedTime) {
     return {
       success: false,
-      error:
-        "종료 시간은 시작 시간보다 늦어야 해요.",
+      error: "종료 시간은 시작 시간보다 늦어야 해요.",
     };
   }
 
@@ -139,63 +124,51 @@ export async function createProposal(
   ) {
     return {
       success: false,
-      error:
-        "인원은 1명에서 4명까지 선택해주세요.",
+      error: "인원은 1명에서 4명까지 선택해주세요.",
     };
   }
 
   if (!meetingType) {
     return {
       success: false,
-      error:
-        "약속 유형을 선택해주세요.",
+      error: "약속 유형을 선택해주세요.",
     };
   }
 
-  const todayKST =
-    new Intl.DateTimeFormat(
-      "en-CA",
-      {
-        timeZone: "Asia/Seoul",
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-      }
-    ).format(new Date());
+  const todayKST = new Intl.DateTimeFormat(
+    "en-CA",
+    {
+      timeZone: "Asia/Seoul",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }
+  ).format(new Date());
 
   if (proposedDate < todayKST) {
     return {
       success: false,
-      error:
-        "지난 날짜는 제안할 수 없어요.",
+      error: "지난 날짜는 제안할 수 없어요.",
     };
   }
 
-  const supabase =
-    await createClient();
+  const supabase = await createClient();
 
-  const { error: insertError } =
-    await supabase
-      .from("date_proposals")
-      .insert({
-        id: randomUUID(),
-        guest_name: guestName,
-        guest_contact: guestContact,
-        proposed_date:
-          proposedDate,
-        proposed_time:
-          proposedTime,
-        proposed_end_time:
-          proposedEndTime,
-        booking_title:
-          bookingTitle,
-        guest_count:
-          guestCount,
-        meeting_type:
-          meetingType,
-        note,
-        status: "pending",
-      });
+  const { error: insertError } = await supabase
+    .from("date_proposals")
+    .insert({
+      id: randomUUID(),
+      guest_name: guestName,
+      guest_contact: guestContact,
+      proposed_date: proposedDate,
+      proposed_time: proposedTime,
+      proposed_end_time: proposedEndTime,
+      booking_title: bookingTitle,
+      guest_count: guestCount,
+      meeting_type: meetingType,
+      note,
+      status: "pending",
+    });
 
   if (insertError) {
     console.error(
@@ -209,7 +182,6 @@ export async function createProposal(
     };
   }
 
-  // 관리자 이메일 알림
   if (
     resend &&
     ADMIN_NOTIFICATION_EMAIL
@@ -240,8 +212,7 @@ ${adminUrl}`;
       await resend.emails.send({
         from: RESEND_FROM_EMAIL,
         to: ADMIN_NOTIFICATION_EMAIL,
-        subject:
-          `[캐치캐치보] ${guestName}님의 날짜 제안`,
+        subject: `[캐치캐치보] ${guestName}님의 날짜 제안`,
         text,
       });
 
@@ -272,34 +243,26 @@ export async function acceptProposal(
     booking: Booking;
   }>
 > {
-  const supabase =
-    await createClient();
+  const supabase = await createClient();
 
   const {
     data: { user },
     error: authError,
-  } =
-    await supabase.auth.getUser();
+  } = await supabase.auth.getUser();
 
   if (authError || !user) {
     return {
       success: false,
-      error:
-        "로그인이 필요해요.",
+      error: "로그인이 필요해요.",
     };
   }
 
   if (!proposalId) {
     return {
       success: false,
-      error:
-        "날짜 제안 정보가 올바르지 않아요.",
+      error: "날짜 제안 정보가 올바르지 않아요.",
     };
   }
-
-  // ------------------------------------------------------------
-  // 1. pending 제안 조회
-  // ------------------------------------------------------------
 
   const {
     data: proposal,
@@ -311,10 +274,7 @@ export async function acceptProposal(
     .eq("status", "pending")
     .single();
 
-  if (
-    proposalError ||
-    !proposal
-  ) {
+  if (proposalError || !proposal) {
     console.error(
       "acceptProposal lookup error:",
       proposalError
@@ -322,8 +282,7 @@ export async function acceptProposal(
 
     return {
       success: false,
-      error:
-        "수락할 날짜 제안을 찾을 수 없어요.",
+      error: "수락할 날짜 제안을 찾을 수 없어요.",
     };
   }
 
@@ -338,43 +297,27 @@ export async function acceptProposal(
     };
   }
 
-  const slotId =
-    randomUUID();
+  const slotId = randomUUID();
+  const bookingId = randomUUID();
+  const now = new Date().toISOString();
 
-  const bookingId =
-    randomUUID();
-
-  const now =
-    new Date().toISOString();
-
-  // ------------------------------------------------------------
-  // 2. 임시 활성 슬롯 생성
-  //
-  // bookings INSERT 시 기존 DB 트리거가
-  // 비활성 슬롯 예약을 막기 때문에 일단 true로 생성
-  // ------------------------------------------------------------
-
-  const {
-    error: slotError,
-  } = await supabase
+  // 예약 생성 트리거 통과를 위해 활성 슬롯으로 생성합니다.
+  // 확정 예약이 들어가면 remaining이 0이 되어 공개 캘린더에 마감으로 표시됩니다.
+  const { error: slotError } = await supabase
     .from("available_slots")
     .insert({
       id: slotId,
       owner_id: user.id,
-      date:
-        proposal.proposed_date,
-      start_time:
-        proposal.proposed_time,
-      end_time:
-        proposal.proposed_end_time,
-      title:
-        proposal.booking_title,
-      meeting_type:
-        proposal.meeting_type,
-      description:
-        proposal.note,
-      location_text:
-        "tbd",
+      date: proposal.proposed_date,
+      start_time: proposal.proposed_time,
+      end_time: proposal.proposed_end_time,
+      title: proposal.booking_title,
+      meeting_type: proposal.meeting_type,
+      description: proposal.note,
+      location_text: "tbd",
+      image_url: null,
+      image_position: "center",
+      image_text_color: "dark",
       max_guests: 1,
       is_active: true,
       created_at: now,
@@ -393,29 +336,17 @@ export async function acceptProposal(
     };
   }
 
-  // ------------------------------------------------------------
-  // 3. confirmed 예약 생성
-  // ------------------------------------------------------------
-
-  const {
-    error: bookingError,
-  } = await supabase
+  const { error: bookingError } = await supabase
     .from("bookings")
     .insert({
       id: bookingId,
       slot_id: slotId,
-      guest_name:
-        proposal.guest_name,
-      guest_contact:
-        proposal.guest_contact,
-      booking_title:
-        proposal.booking_title,
-      guest_count:
-        proposal.guest_count,
-      meeting_type:
-        proposal.meeting_type,
-      note:
-        proposal.note,
+      guest_name: proposal.guest_name,
+      guest_contact: proposal.guest_contact,
+      booking_title: proposal.booking_title,
+      guest_count: proposal.guest_count,
+      meeting_type: proposal.meeting_type,
+      note: proposal.note,
       status: "confirmed",
       created_at: now,
       canceled_at: null,
@@ -427,20 +358,10 @@ export async function acceptProposal(
       bookingError
     );
 
-    // 슬롯 롤백
-    const {
-      error: rollbackSlotError,
-    } = await supabase
+    await supabase
       .from("available_slots")
       .delete()
       .eq("id", slotId);
-
-    if (rollbackSlotError) {
-      console.error(
-        "Proposal slot rollback error:",
-        rollbackSlotError
-      );
-    }
 
     return {
       success: false,
@@ -451,54 +372,24 @@ export async function acceptProposal(
   const booking: Booking = {
     id: bookingId,
     slot_id: slotId,
-
-    guest_name:
-      proposal.guest_name,
-
-    guest_contact:
-      proposal.guest_contact,
-
-    booking_title:
-      proposal.booking_title,
-
-    guest_count:
-      proposal.guest_count,
-
-    meeting_type:
-      proposal.meeting_type,
-
-    note:
-      proposal.note,
-
+    guest_name: proposal.guest_name,
+    guest_contact: proposal.guest_contact,
+    booking_title: proposal.booking_title,
+    guest_count: proposal.guest_count,
+    meeting_type: proposal.meeting_type,
+    note: proposal.note,
     status: "confirmed",
-
     created_at: now,
-
     canceled_at: null,
-
     available_slots: {
-      date:
-        proposal.proposed_date,
-
-      start_time:
-        proposal.proposed_time,
-
-      end_time:
-        proposal.proposed_end_time,
-
-      title:
-        proposal.booking_title,
-
+      date: proposal.proposed_date,
+      start_time: proposal.proposed_time,
+      end_time: proposal.proposed_end_time,
+      title: proposal.booking_title,
       location_text: "tbd",
-
-      meeting_type:
-        proposal.meeting_type,
+      meeting_type: proposal.meeting_type,
     },
   };
-
-  // ------------------------------------------------------------
-  // 4. Google Calendar 일정 생성
-  // ------------------------------------------------------------
 
   let calendarEventId: string;
 
@@ -513,35 +404,15 @@ export async function acceptProposal(
       calendarError
     );
 
-    // 예약 롤백
-    const {
-      error: rollbackBookingError,
-    } = await supabase
+    await supabase
       .from("bookings")
       .delete()
       .eq("id", bookingId);
 
-    if (rollbackBookingError) {
-      console.error(
-        "Proposal booking rollback error:",
-        rollbackBookingError
-      );
-    }
-
-    // 슬롯 롤백
-    const {
-      error: rollbackSlotError,
-    } = await supabase
+    await supabase
       .from("available_slots")
       .delete()
       .eq("id", slotId);
-
-    if (rollbackSlotError) {
-      console.error(
-        "Proposal slot rollback error:",
-        rollbackSlotError
-      );
-    }
 
     return {
       success: false,
@@ -551,10 +422,6 @@ export async function acceptProposal(
           : "Google Calendar 등록에 실패했어요.",
     };
   }
-
-  // ------------------------------------------------------------
-  // 5. Google Calendar 이벤트 ID 예약에 저장
-  // ------------------------------------------------------------
 
   const {
     error: calendarIdError,
@@ -572,7 +439,6 @@ export async function acceptProposal(
       calendarIdError
     );
 
-    // Calendar 롤백
     try {
       await deleteGoogleCalendarEvent(
         calendarEventId
@@ -584,13 +450,11 @@ export async function acceptProposal(
       );
     }
 
-    // 예약 롤백
     await supabase
       .from("bookings")
       .delete()
       .eq("id", bookingId);
 
-    // 슬롯 롤백
     await supabase
       .from("available_slots")
       .delete()
@@ -601,10 +465,6 @@ export async function acceptProposal(
       error: `Google Calendar 정보 저장 실패: ${calendarIdError.message}`,
     };
   }
-
-  // ------------------------------------------------------------
-  // 6. 날짜 제안 accepted 처리
-  // ------------------------------------------------------------
 
   const {
     data: acceptedProposal,
@@ -628,7 +488,6 @@ export async function acceptProposal(
       acceptError
     );
 
-    // Calendar 롤백
     try {
       await deleteGoogleCalendarEvent(
         calendarEventId
@@ -640,13 +499,11 @@ export async function acceptProposal(
       );
     }
 
-    // 예약 롤백
     await supabase
       .from("bookings")
       .delete()
       .eq("id", bookingId);
 
-    // 슬롯 롤백
     await supabase
       .from("available_slots")
       .delete()
@@ -660,7 +517,12 @@ export async function acceptProposal(
     };
   }
 
-  }
+  /*
+   * 여기서 슬롯을 비활성화하지 않습니다.
+   * is_active는 true로 유지되고,
+   * confirmed 예약 1건 때문에 remaining이 0이 되어
+   * 공개 캘린더에 마감 일정으로 표시됩니다.
+   */
 
   revalidatePath("/admin");
   revalidatePath("/book");
@@ -686,28 +548,24 @@ export async function rejectProposal(
     proposal: DateProposal;
   }>
 > {
-  const supabase =
-    await createClient();
+  const supabase = await createClient();
 
   const {
     data: { user },
     error: authError,
-  } =
-    await supabase.auth.getUser();
+  } = await supabase.auth.getUser();
 
   if (authError || !user) {
     return {
       success: false,
-      error:
-        "로그인이 필요해요.",
+      error: "로그인이 필요해요.",
     };
   }
 
   if (!proposalId) {
     return {
       success: false,
-      error:
-        "날짜 제안 정보가 올바르지 않아요.",
+      error: "날짜 제안 정보가 올바르지 않아요.",
     };
   }
 
