@@ -205,11 +205,11 @@ export default function ProposalForm() {
       {/* 주말 불가 안내 */}
       <div className="rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3">
         <p className="text-sm font-semibold text-amber-700">
-          주말에는 만나기 어려워요 🙏
+          주말 약속은 제가 열어둔 날짜에만 가능해요 🙏
         </p>
 
         <p className="text-xs text-amber-600 mt-1">
-          월요일부터 금요일 중 가능한 날짜를 골라주세요.
+          다른 날짜를 제안할 때는 월요일부터 금요일 중 골라주세요.
         </p>
       </div>
 
