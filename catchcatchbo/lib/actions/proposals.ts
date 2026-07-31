@@ -660,31 +660,6 @@ export async function acceptProposal(
     };
   }
 
-  // ------------------------------------------------------------
-  // 7. 확정이 끝난 슬롯은 공개 예약에서 숨김
-  // ------------------------------------------------------------
-
-  const {
-    error: deactivateError,
-  } = await supabase
-    .from("available_slots")
-    .update({
-      is_active: false,
-      updated_at:
-        new Date().toISOString(),
-    })
-    .eq("id", slotId);
-
-  if (deactivateError) {
-    console.error(
-      "Proposal slot deactivate error:",
-      deactivateError
-    );
-
-    /*
-     * 이 단계는 예약/Calendar/제안 확정까지는 이미 성공한 상태.
-     * 비활성 처리 실패 때문에 전체 성공을 되돌리지는 않음.
-     */
   }
 
   revalidatePath("/admin");
