@@ -41,6 +41,52 @@ export default function ProposalForm() {
       }
     ).format(new Date());
 
+  function isWeekend(
+    dateString: string
+  ): boolean {
+    const [
+      year,
+      month,
+      day,
+    ] = dateString
+      .split("-")
+      .map(Number);
+
+    const date = new Date(
+      year,
+      month - 1,
+      day
+    );
+
+    const weekday =
+      date.getDay();
+
+    return (
+      weekday === 0 ||
+      weekday === 6
+    );
+  }
+
+  function handleDateChange(
+    event: React.ChangeEvent<HTMLInputElement>
+  ) {
+    const selectedDate =
+      event.target.value;
+
+    setError(null);
+
+    if (
+      selectedDate &&
+      isWeekend(selectedDate)
+    ) {
+      setError(
+        "주말에는 만나기 어려워요. 평일 날짜로 선택해주세요."
+      );
+
+      event.target.value = "";
+    }
+  }
+
   function handleSubmit(
     event: React.FormEvent<HTMLFormElement>
   ) {
@@ -51,6 +97,33 @@ export default function ProposalForm() {
       new FormData(
         event.currentTarget
       );
+
+    const proposedDate =
+      (
+        formData.get(
+          "proposed_date"
+        ) as string
+      )?.trim();
+
+    if (
+      !proposedDate
+    ) {
+      setError(
+        "희망 날짜를 선택해주세요."
+      );
+      return;
+    }
+
+    if (
+      isWeekend(
+        proposedDate
+      )
+    ) {
+      setError(
+        "주말에는 만나기 어려워요. 월요일부터 금요일 중 선택해주세요."
+      );
+      return;
+    }
 
     startTransition(async () => {
       const result =
@@ -129,12 +202,26 @@ export default function ProposalForm() {
         maxLength={40}
       />
 
+      {/* 주말 불가 안내 */}
+      <div className="rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3">
+        <p className="text-sm font-semibold text-amber-700">
+          주말에는 만나기 어려워요 🙏
+        </p>
+
+        <p className="text-xs text-amber-600 mt-1">
+          월요일부터 금요일 중 가능한 날짜를 골라주세요.
+        </p>
+      </div>
+
       <Input
         label="희망 날짜"
         name="proposed_date"
         type="date"
         required
         min={today}
+        onChange={
+          handleDateChange
+        }
       />
 
       {/* 시작 / 종료 시간 */}
@@ -169,10 +256,21 @@ export default function ProposalForm() {
           required
           className="input-base"
         >
-          <option value="1">1명</option>
-          <option value="2">2명</option>
-          <option value="3">3명</option>
-          <option value="4">4명</option>
+          <option value="1">
+            1명
+          </option>
+
+          <option value="2">
+            2명
+          </option>
+
+          <option value="3">
+            3명
+          </option>
+
+          <option value="4">
+            4명
+          </option>
         </select>
       </div>
 
@@ -244,8 +342,7 @@ export default function ProposalForm() {
       </Button>
 
       <p className="text-xs text-center text-warm-gray-400">
-        제안을 보내면 확인 후 따로
-        알려드릴게요 😊
+        제안을 보내면 확인 후 따로 알려드릴게요 😊
       </p>
     </form>
   );
