@@ -1,6 +1,9 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import {
+  useState,
+  useTransition,
+} from "react";
 import {
   Input,
   Textarea,
@@ -13,7 +16,6 @@ import {
 } from "@/lib/constants";
 import {
   formatKoreanDate,
-  formatTimeRange,
   getMeetingTypeLabel,
   getLocationLabel,
 } from "@/lib/utils";
@@ -27,6 +29,36 @@ interface BookingFormProps {
   slot: SlotWithCount;
 }
 
+// ============================================================
+// 날짜 범위 표시
+// ============================================================
+
+function formatDateRange(
+  startDate: string,
+  endDate?: string | null
+): string {
+  const finalEndDate =
+    endDate || startDate;
+
+  if (
+    startDate === finalEndDate
+  ) {
+    return formatKoreanDate(
+      startDate
+    );
+  }
+
+  return `${formatKoreanDate(
+    startDate
+  )} ~ ${formatKoreanDate(
+    finalEndDate
+  )}`;
+}
+
+// ============================================================
+// 예약 완료 화면
+// ============================================================
+
 function CompletionScreen({
   booking,
   slot,
@@ -35,7 +67,14 @@ function CompletionScreen({
   slot: SlotWithCount;
 }) {
   const slotInfo =
-    booking.available_slots ?? slot;
+    booking.available_slots ??
+    slot;
+
+  const dateRange =
+    formatDateRange(
+      slotInfo.date,
+      slotInfo.end_date
+    );
 
   return (
     <div className="flex flex-col items-center text-center px-5 py-12 slide-up">
@@ -72,34 +111,20 @@ function CompletionScreen({
             </span>
 
             <span className="font-semibold text-warm-gray-700 text-right">
-              {booking.booking_title}
+              {
+                booking.booking_title
+              }
             </span>
           </div>
 
           {/* 날짜 */}
           <div className="flex justify-between gap-4">
-            <span className="text-warm-gray-400">
+            <span className="text-warm-gray-400 shrink-0">
               날짜
             </span>
 
             <span className="font-medium text-warm-gray-700 text-right">
-              {formatKoreanDate(
-                slotInfo.date
-              )}
-            </span>
-          </div>
-
-          {/* 시간 */}
-          <div className="flex justify-between gap-4">
-            <span className="text-warm-gray-400">
-              시간
-            </span>
-
-            <span className="font-medium text-warm-gray-700 text-right">
-              {formatTimeRange(
-                slotInfo.start_time,
-                slotInfo.end_time
-              )}
+              {dateRange}
             </span>
           </div>
 
@@ -110,7 +135,9 @@ function CompletionScreen({
             </span>
 
             <span className="font-medium text-warm-gray-700">
-              {booking.guest_name}
+              {
+                booking.guest_name
+              }
             </span>
           </div>
 
@@ -121,7 +148,10 @@ function CompletionScreen({
             </span>
 
             <span className="font-medium text-warm-gray-700">
-              {booking.guest_count}명
+              {
+                booking.guest_count
+              }
+              명
             </span>
           </div>
 
@@ -164,6 +194,10 @@ function CompletionScreen({
   );
 }
 
+// ============================================================
+// 예약 신청 폼
+// ============================================================
+
 export default function BookingForm({
   slot,
 }: BookingFormProps) {
@@ -178,17 +212,23 @@ export default function BookingForm({
   const [
     completedBooking,
     setCompletedBooking,
-  ] = useState<Booking | null>(null);
+  ] = useState<Booking | null>(
+    null
+  );
 
   const [
     selectedMeetingType,
     setSelectedMeetingType,
-  ] = useState(slot.meeting_type);
+  ] = useState(
+    slot.meeting_type
+  );
 
   if (completedBooking) {
     return (
       <CompletionScreen
-        booking={completedBooking}
+        booking={
+          completedBooking
+        }
         slot={slot}
       />
     );
@@ -198,6 +238,7 @@ export default function BookingForm({
     event: React.FormEvent<HTMLFormElement>
   ) {
     event.preventDefault();
+
     setError(null);
 
     const formData =
@@ -205,31 +246,40 @@ export default function BookingForm({
         event.currentTarget
       );
 
-    startTransition(async () => {
-      const result =
-        await createBooking(
-          slot.id,
-          formData
-        );
+    startTransition(
+      async () => {
+        const result =
+          await createBooking(
+            slot.id,
+            formData
+          );
 
-      if (
-        result.success &&
-        result.data
-      ) {
-        setCompletedBooking(
-          result.data.booking
+        if (
+          result.success &&
+          result.data
+        ) {
+          setCompletedBooking(
+            result.data.booking
+          );
+
+          return;
+        }
+
+        setError(
+          result.error ??
+            "예약 신청 중 오류가 발생했어요. 다시 시도해주세요."
         );
-        return;
       }
-
-      setError(
-        result.error ??
-          "예약 신청 중 오류가 발생했어요. 다시 시도해주세요."
-      );
-    });
+    );
   }
 
-  if (slot.remaining === 0) {
+  // ============================================================
+  // 이미 마감된 일정
+  // ============================================================
+
+  if (
+    slot.remaining === 0
+  ) {
     return (
       <div className="text-center py-12 px-5">
         <p className="text-4xl mb-4">
@@ -237,7 +287,7 @@ export default function BookingForm({
         </p>
 
         <p className="font-semibold text-warm-gray-700">
-          이 시간은 이미 약속이
+          이 날짜는 이미 약속이
           잡혔어요
         </p>
 
@@ -248,9 +298,15 @@ export default function BookingForm({
     );
   }
 
+  // ============================================================
+  // 입력 화면
+  // ============================================================
+
   return (
     <form
-      onSubmit={handleSubmit}
+      onSubmit={
+        handleSubmit
+      }
       className="flex flex-col gap-5 px-5 pb-10"
     >
       {/* 이름 */}
@@ -302,12 +358,15 @@ export default function BookingForm({
           <option value="1">
             1명
           </option>
+
           <option value="2">
             2명
           </option>
+
           <option value="3">
             3명
           </option>
+
           <option value="4">
             4명
           </option>
@@ -324,13 +383,17 @@ export default function BookingForm({
           {MEETING_TYPES.map(
             (type) => (
               <label
-                key={type.value}
+                key={
+                  type.value
+                }
                 className="relative cursor-pointer"
               >
                 <input
                   type="radio"
                   name="meeting_type"
-                  value={type.value}
+                  value={
+                    type.value
+                  }
                   checked={
                     selectedMeetingType ===
                     type.value
@@ -352,7 +415,9 @@ export default function BookingForm({
                       : "border-warm-gray-200 bg-white text-warm-gray-600"
                   }`}
                 >
-                  {type.label}
+                  {
+                    type.label
+                  }
                 </div>
               </label>
             )
@@ -368,19 +433,25 @@ export default function BookingForm({
         rows={2}
       />
 
+      {/* 오류 */}
       {error && (
         <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-sm text-red-500">
           {error}
         </div>
       )}
 
+      {/* 신청 버튼 */}
       <Button
         type="submit"
         fullWidth
-        loading={isPending}
+        loading={
+          isPending
+        }
         size="lg"
       >
-        {BOOKING_BUTTON_TEXT}
+        {
+          BOOKING_BUTTON_TEXT
+        }
       </Button>
 
       <p className="text-xs text-center text-warm-gray-400">
