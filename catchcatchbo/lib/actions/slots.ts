@@ -29,8 +29,7 @@ function resolveLocationText(
 
   return (
     LOCATION_PRESETS.find(
-      (item) =>
-        item.value === preset
+      (item) => item.value === preset
     )?.value ?? "tbd"
   );
 }
@@ -94,21 +93,44 @@ function getSlotFormData(
       ? "light"
       : "dark";
 
-  return {
-    date:
-      (formData.get(
+  const date =
+    (
+      formData.get(
         "date"
-      ) as string) || "",
+      ) as string
+    ) || "";
 
+  const endDate =
+    (
+      formData.get(
+        "end_date"
+      ) as string
+    ) || date;
+
+  return {
+    // 시작일
+    date,
+
+    // 종료일
+    end_date: endDate,
+
+    /*
+     * 기존 DB 호환용.
+     * 화면에서는 더 이상 시간을 받지 않습니다.
+     */
     start_time:
-      (formData.get(
-        "start_time"
-      ) as string) || "",
+      (
+        formData.get(
+          "start_time"
+        ) as string
+      ) || "00:00",
 
     end_time:
-      (formData.get(
-        "end_time"
-      ) as string) || "",
+      (
+        formData.get(
+          "end_time"
+        ) as string
+      ) || "23:59",
 
     title:
       (
@@ -176,22 +198,24 @@ function validateSlotForm(
   data: SlotFormData
 ): string | null {
   if (!data.date) {
-    return "날짜를 선택해주세요.";
+    return "시작 날짜를 선택해주세요.";
   }
 
-  if (!data.start_time) {
-    return "시작 시간을 입력해주세요.";
+  if (!data.end_date) {
+    return "종료 날짜를 선택해주세요.";
   }
 
-  if (!data.end_time) {
-    return "종료 시간을 입력해주세요.";
-  }
-
+  /*
+   * 당일 약속은
+   * date === end_date 이므로 허용.
+   *
+   * 종료일이 시작일보다 앞선 경우만 차단.
+   */
   if (
-    data.start_time >=
-    data.end_time
+    data.end_date <
+    data.date
   ) {
-    return "종료 시간은 시작 시간보다 늦어야 해요.";
+    return "종료 날짜는 시작 날짜보다 빠를 수 없어요.";
   }
 
   if (
@@ -231,7 +255,9 @@ async function uploadSlotImage(
   error: string | null;
 }> {
   const file =
-    formData.get("slot_image");
+    formData.get(
+      "slot_image"
+    );
 
   if (
     !(file instanceof File) ||
@@ -283,7 +309,9 @@ async function uploadSlotImage(
     error: uploadError,
   } =
     await supabase.storage
-      .from("slot-images")
+      .from(
+        "slot-images"
+      )
       .upload(
         filePath,
         file,
@@ -313,7 +341,9 @@ async function uploadSlotImage(
     data: publicUrlData,
   } =
     supabase.storage
-      .from("slot-images")
+      .from(
+        "slot-images"
+      )
       .getPublicUrl(
         filePath
       );
@@ -401,53 +431,63 @@ export async function createSlot(
   const {
     data: slot,
     error,
-  } = await supabase
-    .from(
-      "available_slots"
-    )
-    .insert({
-      owner_id:
-        user.id,
+  } =
+    await supabase
+      .from(
+        "available_slots"
+      )
+      .insert({
+        owner_id:
+          user.id,
 
-      date:
-        data.date,
+        // 시작일
+        date:
+          data.date,
 
-      start_time:
-        data.start_time,
+        // 종료일
+        end_date:
+          data.end_date,
 
-      end_time:
-        data.end_time,
+        /*
+         * 기존 컬럼은 삭제하지 않고
+         * 하루 전체 값으로 저장.
+         */
+        start_time:
+          "00:00",
 
-      title:
-        data.title ||
-        null,
+        end_time:
+          "23:59",
 
-      meeting_type:
-        data.meeting_type.trim(),
+        title:
+          data.title ||
+          null,
 
-      description:
-        data.description ||
-        null,
+        meeting_type:
+          data.meeting_type.trim(),
 
-      location_text:
-        locationText,
+        description:
+          data.description ||
+          null,
 
-      image_url:
-        uploadedUrl,
+        location_text:
+          locationText,
 
-      image_position:
-        data.image_position,
+        image_url:
+          uploadedUrl,
 
-      image_text_color:
-        data.image_text_color,
+        image_position:
+          data.image_position,
 
-      max_guests: 1,
+        image_text_color:
+          data.image_text_color,
 
-      is_active:
-        true,
-    })
-    .select("id")
-    .single();
+        max_guests: 1,
+
+        is_active:
+          true,
+      })
+      .select("id")
+      .single();
 
   if (
     error ||
@@ -473,7 +513,9 @@ export async function createSlot(
     "/book"
   );
 
-  redirect("/admin");
+  redirect(
+    "/admin"
+  );
 }
 
 // ============================================================
@@ -548,6 +590,10 @@ export async function updateSlot(
     };
   }
 
+  /*
+   * 새 이미지를 올렸으면 새 URL,
+   * 아니면 기존 이미지 유지.
+   */
   const finalImageUrl =
     uploadedUrl ??
     data.image_url ??
@@ -565,14 +611,20 @@ export async function updateSlot(
         "available_slots"
       )
       .update({
+        // 시작일
         date:
           data.date,
 
+        // 종료일
+        end_date:
+          data.end_date,
+
+        // 기존 DB 호환용
         start_time:
-          data.start_time,
+          "00:00",
 
         end_time:
-          data.end_time,
+          "23:59",
 
         title:
           data.title ||
@@ -629,7 +681,9 @@ export async function updateSlot(
     "/book"
   );
 
-  redirect("/admin");
+  redirect(
+    "/admin"
+  );
 }
 
 // ============================================================
