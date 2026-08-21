@@ -30,6 +30,16 @@ export default function ProposalForm() {
   const [isCompleted, setIsCompleted] =
     useState(false);
 
+  const [
+    startDate,
+    setStartDate,
+  ] = useState("");
+
+  const [
+    endDate,
+    setEndDate,
+  ] = useState("");
+
   const today =
     new Intl.DateTimeFormat(
       "en-CA",
@@ -41,51 +51,49 @@ export default function ProposalForm() {
       }
     ).format(new Date());
 
-  function isWeekend(
-    dateString: string
-  ): boolean {
-    const [
-      year,
-      month,
-      day,
-    ] = dateString
-      .split("-")
-      .map(Number);
+  // ============================================================
+  // 시작일 변경
+  // ============================================================
 
-    const date = new Date(
-      year,
-      month - 1,
-      day
-    );
-
-    const weekday =
-      date.getDay();
-
-    return (
-      weekday === 0 ||
-      weekday === 6
-    );
-  }
-
-  function handleDateChange(
+  function handleStartDateChange(
     event: React.ChangeEvent<HTMLInputElement>
   ) {
-    const selectedDate =
+    const value =
       event.target.value;
 
+    setStartDate(value);
     setError(null);
 
+    /*
+     * 종료일이 비어 있거나
+     * 새 시작일보다 앞이라면
+     * 자동으로 같은 날짜로 맞춤
+     */
     if (
-      selectedDate &&
-      isWeekend(selectedDate)
+      !endDate ||
+      endDate < value
     ) {
-      setError(
-        "주말에는 만나기 어려워요. 평일 날짜로 선택해주세요."
-      );
-
-      event.target.value = "";
+      setEndDate(value);
     }
   }
+
+  // ============================================================
+  // 종료일 변경
+  // ============================================================
+
+  function handleEndDateChange(
+    event: React.ChangeEvent<HTMLInputElement>
+  ) {
+    setEndDate(
+      event.target.value
+    );
+
+    setError(null);
+  }
+
+  // ============================================================
+  // 제출
+  // ============================================================
 
   function handleSubmit(
     event: React.FormEvent<HTMLFormElement>
@@ -93,55 +101,86 @@ export default function ProposalForm() {
     event.preventDefault();
     setError(null);
 
+    if (!startDate) {
+      setError(
+        "희망 시작일을 선택해주세요."
+      );
+      return;
+    }
+
+    if (!endDate) {
+      setError(
+        "희망 종료일을 선택해주세요."
+      );
+      return;
+    }
+
+    if (
+      endDate < startDate
+    ) {
+      setError(
+        "종료일은 시작일보다 빠를 수 없어요."
+      );
+      return;
+    }
+
     const formData =
       new FormData(
         event.currentTarget
       );
 
-    const proposedDate =
-      (
-        formData.get(
-          "proposed_date"
-        ) as string
-      )?.trim();
+    formData.set(
+      "proposed_date",
+      startDate
+    );
 
-    if (
-      !proposedDate
-    ) {
-      setError(
-        "희망 날짜를 선택해주세요."
-      );
-      return;
-    }
+    formData.set(
+      "proposed_end_date",
+      endDate
+    );
 
-    if (
-      isWeekend(
-        proposedDate
-      )
-    ) {
-      setError(
-        "주말에는 만나기 어려워요. 월요일부터 금요일 중 선택해주세요."
-      );
-      return;
-    }
+    /*
+     * 아직 proposals.ts가 기존 시간 컬럼을
+     * 사용할 수 있으므로 호환용 값 전달.
+     * 다음 단계에서 서버 로직도 날짜 기준으로 바꿀 예정.
+     */
+    formData.set(
+      "proposed_time",
+      "00:00"
+    );
 
-    startTransition(async () => {
-      const result =
-        await createProposal(
-          formData
+    formData.set(
+      "proposed_end_time",
+      "23:59"
+    );
+
+    startTransition(
+      async () => {
+        const result =
+          await createProposal(
+            formData
+          );
+
+        if (
+          !result.success
+        ) {
+          setError(
+            result.error ??
+              "날짜 제안 중 오류가 발생했어요."
+          );
+          return;
+        }
+
+        setIsCompleted(
+          true
         );
-
-      if (!result.success) {
-        setError(
-          result.error ??
-            "날짜 제안 중 오류가 발생했어요."
-        );
-        return;
       }
-
-      setIsCompleted(true);
-    });
+    );
   }
+
+  // ============================================================
+  // 완료 화면
+  // ============================================================
 
   if (isCompleted) {
     return (
@@ -170,11 +209,16 @@ export default function ProposalForm() {
     );
   }
 
+  // ============================================================
+  // 입력 화면
+  // ============================================================
+
   return (
     <form
       onSubmit={handleSubmit}
       className="flex flex-col gap-5"
     >
+      {/* 이름 */}
       <Input
         label="이름"
         name="guest_name"
@@ -185,6 +229,7 @@ export default function ProposalForm() {
         autoComplete="name"
       />
 
+      {/* 연락처 */}
       <Input
         label="연락처 또는 카카오톡 이름 (선택)"
         name="guest_contact"
@@ -193,6 +238,7 @@ export default function ProposalForm() {
         hint="제안 확인 후 연락할 수 있게 남겨주세요"
       />
 
+      {/* 약속 이름 */}
       <Input
         label="약속 이름"
         name="booking_title"
@@ -202,45 +248,72 @@ export default function ProposalForm() {
         maxLength={40}
       />
 
-      {/* 주말 불가 안내 */}
-      <div className="rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3">
-        <p className="text-sm font-semibold text-amber-700">
-          주말 약속은 제가 열어둔 날짜에만 가능해요 🙏
-        </p>
+      {/* 날짜 범위 */}
+      <div className="flex flex-col gap-2">
+        <label className="text-sm font-medium text-warm-gray-700">
+          희망 날짜
+        </label>
 
-        <p className="text-xs text-amber-600 mt-1">
-          다른 날짜를 제안할 때는 월요일부터 금요일 중 골라주세요.
+        <div className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs text-warm-gray-400">
+              시작일
+            </span>
+
+            <input
+              name="proposed_date"
+              type="date"
+              required
+              min={today}
+              value={startDate}
+              onChange={
+                handleStartDateChange
+              }
+              className="input-base"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs text-warm-gray-400">
+              종료일
+            </span>
+
+            <input
+              name="proposed_end_date"
+              type="date"
+              required
+              min={
+                startDate ||
+                today
+              }
+              value={endDate}
+              onChange={
+                handleEndDateChange
+              }
+              className="input-base"
+            />
+          </div>
+        </div>
+
+        <p className="text-xs text-warm-gray-400">
+          당일 약속은 시작일과 종료일을 같은 날짜로 선택해주세요.
         </p>
       </div>
 
-      <Input
-        label="희망 날짜"
-        name="proposed_date"
-        type="date"
-        required
-        min={today}
-        onChange={
-          handleDateChange
-        }
+      {/* 서버 호환용 시간 */}
+      <input
+        type="hidden"
+        name="proposed_time"
+        value="00:00"
       />
 
-      {/* 시작 / 종료 시간 */}
-      <div className="grid grid-cols-2 gap-3">
-        <Input
-          label="시작 시간"
-          name="proposed_time"
-          type="time"
-          required
-        />
+      <input
+        type="hidden"
+        name="proposed_end_time"
+        value="23:59"
+      />
 
-        <Input
-          label="종료 시간"
-          name="proposed_end_time"
-          type="time"
-          required
-        />
-      </div>
-
+      {/* 인원 */}
       <div className="flex flex-col gap-1.5">
         <label
           htmlFor="guest_count"
@@ -274,6 +347,7 @@ export default function ProposalForm() {
         </select>
       </div>
 
+      {/* 약속 유형 */}
       <div className="flex flex-col gap-1.5">
         <label className="text-sm font-medium text-warm-gray-700">
           어떤 약속이에요?
@@ -319,6 +393,7 @@ export default function ProposalForm() {
         </div>
       </div>
 
+      {/* 메모 */}
       <Textarea
         label="메모 (선택)"
         name="note"
@@ -326,12 +401,14 @@ export default function ProposalForm() {
         rows={3}
       />
 
+      {/* 오류 */}
       {error && (
         <div className="bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-sm text-red-500">
           {error}
         </div>
       )}
 
+      {/* 제출 */}
       <Button
         type="submit"
         fullWidth
