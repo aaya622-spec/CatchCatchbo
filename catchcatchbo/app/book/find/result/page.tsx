@@ -148,22 +148,18 @@ export default async function FindBookingResultPage({
   } = await supabase
     .from("bookings")
     .select(`
-      id,
-      manage_token,
-      guest_name,
-      guest_contact,
-      booking_title,
-      guest_count,
-      meeting_type,
-      status,
-      created_at,
-      available_slots (
-        date,
-        end_date,
-        title,
-        location_text
-      )
-    `)
+  id,
+  manage_token,
+  guest_name,
+  guest_contact,
+  booking_title,
+  guest_count,
+  meeting_type,
+  proposed_date,
+  proposed_end_date,
+  status,
+  created_at
+`)
     .eq("guest_name", name)
     .order("created_at", {
       ascending: false,
@@ -372,6 +368,16 @@ export default async function FindBookingResultPage({
                               </p>
                             </div>
                           )}
+
+                          {proposal.status === "pending" &&
+  proposal.manage_token && (
+    <Link
+      href={`/book/proposal/manage/${proposal.manage_token}`}
+      className="btn-primary w-full text-center mt-4"
+    >
+      확인 / 변경하기
+    </Link>
+  )}
 
                           {proposal.status ===
                             "rejected" && (
