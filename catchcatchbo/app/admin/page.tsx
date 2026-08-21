@@ -1,14 +1,19 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
+
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+
 import AdminSlotCard from "@/components/admin/AdminSlotCard";
 import BookingList from "@/components/admin/BookingList";
 import ProposalList from "@/components/admin/ProposalList";
 import ProposalChangeRequestList from "./ProposalChangeRequestList";
 import ShareSection from "@/components/admin/ShareSection";
+
 import { signOut } from "@/lib/actions/auth";
 import { APP_NAME } from "@/lib/constants";
 import { getTodayKST } from "@/lib/utils";
+
 import type {
   SlotWithCount,
   Booking,
@@ -139,6 +144,7 @@ type ProposalChangeRequest = {
 // ============================================================
 
 export default async function AdminPage() {
+  // 일반 로그인 / 기존 관리자 데이터용
   const supabase =
     await createClient();
 
@@ -150,7 +156,12 @@ export default async function AdminPage() {
     redirect("/login");
   }
 
-  const today = getTodayKST();
+  // RLS가 걸린 변경 요청 조회용
+  const adminSupabase =
+    createAdminClient();
+
+  const today =
+    getTodayKST();
 
   // ============================================================
   // 일정 조회
@@ -167,14 +178,26 @@ export default async function AdminPage() {
         status
       )
     `)
-    .eq("owner_id", user.id)
-    .gte("date", today)
-    .order("date", {
-      ascending: true,
-    })
-    .order("start_time", {
-      ascending: true,
-    });
+    .eq(
+      "owner_id",
+      user.id
+    )
+    .gte(
+      "date",
+      today
+    )
+    .order(
+      "date",
+      {
+        ascending: true,
+      }
+    )
+    .order(
+      "start_time",
+      {
+        ascending: true,
+      }
+    );
 
   if (slotsError) {
     console.error(
@@ -199,11 +222,14 @@ export default async function AdminPage() {
     ).length;
 
     return {
-      id: slot.id,
+      id:
+        slot.id,
 
-      owner_id: slot.owner_id,
+      owner_id:
+        slot.owner_id,
 
-      date: slot.date,
+      date:
+        slot.date,
 
       end_date:
         slot.end_date ??
@@ -228,7 +254,8 @@ export default async function AdminPage() {
         slot.location_text,
 
       image_url:
-        slot.image_url ?? null,
+        slot.image_url ??
+        null,
 
       image_position:
         slot.image_position ??
@@ -253,11 +280,12 @@ export default async function AdminPage() {
       booking_count:
         confirmedCount,
 
-      remaining: Math.max(
-        slot.max_guests -
-          confirmedCount,
-        0
-      ),
+      remaining:
+        Math.max(
+          slot.max_guests -
+            confirmedCount,
+          0
+        ),
 
       is_full:
         confirmedCount >=
@@ -271,15 +299,20 @@ export default async function AdminPage() {
 
   const slotIds =
     slots.map(
-      (slot) => slot.id
+      (slot) =>
+        slot.id
     );
 
-  let bookings: Booking[] = [];
+  let bookings: Booking[] =
+    [];
 
-  if (slotIds.length > 0) {
+  if (
+    slotIds.length > 0
+  ) {
     const {
       data: bookingRows,
-      error: bookingsError,
+      error:
+        bookingsError,
     } = await supabase
       .from("bookings")
       .select(`
@@ -318,14 +351,17 @@ export default async function AdminPage() {
   }
 
   // ============================================================
-  // 날짜 제안
+  // 날짜 제안 조회
   // ============================================================
 
   const {
     data: proposalRows,
-    error: proposalsError,
+    error:
+      proposalsError,
   } = await supabase
-    .from("date_proposals")
+    .from(
+      "date_proposals"
+    )
     .select("*")
     .order(
       "created_at",
@@ -341,57 +377,65 @@ export default async function AdminPage() {
     );
   }
 
-  const proposals: DateProposal[] =
-    (proposalRows as DateProposal[]) ??
-    [];
+  const proposals:
+    DateProposal[] =
+      (proposalRows as DateProposal[]) ??
+      [];
 
   // ============================================================
-  // 날짜 제안 변경 요청
+  // 날짜 제안 변경 요청 조회
+  // admin client 사용
   // ============================================================
 
   const {
-    data: proposalChangeRows,
-    error: proposalChangesError,
-  } = await supabase
-    .from(
-      "proposal_change_requests"
-    )
-    .select(`
-      id,
-      proposal_id,
-      booking_title,
-      proposed_date,
-      proposed_end_date,
-      guest_count,
-      meeting_type,
-      note,
-      status,
-      created_at,
-      date_proposals (
+    data:
+      proposalChangeRows,
+
+    error:
+      proposalChangesError,
+  } =
+    await adminSupabase
+      .from(
+        "proposal_change_requests"
+      )
+      .select(`
         id,
-        guest_name,
-        guest_contact,
+        proposal_id,
         booking_title,
         proposed_date,
         proposed_end_date,
         guest_count,
         meeting_type,
         note,
-        status
+        status,
+        created_at,
+        date_proposals (
+          id,
+          guest_name,
+          guest_contact,
+          booking_title,
+          proposed_date,
+          proposed_end_date,
+          guest_count,
+          meeting_type,
+          note,
+          status
+        )
+      `)
+      .eq(
+        "status",
+        "pending"
       )
-    `)
-    .eq(
-      "status",
-      "pending"
-    )
-    .order(
-      "created_at",
-      {
-        ascending: false,
-      }
-    );
+      .order(
+        "created_at",
+        {
+          ascending: false,
+        }
+      );
 
-  if (proposalChangesError) {
+  if (
+    proposalChangesError
+  ) {
     console.error(
       "AdminPage proposal changes error:",
       proposalChangesError
@@ -458,7 +502,9 @@ export default async function AdminPage() {
             {APP_NAME} 관리
           </h1>
 
-          <form action={signOut}>
+          <form
+            action={signOut}
+          >
             <button
               type="submit"
               className="text-sm text-warm-gray-400 active:scale-95 transition-all"
@@ -517,7 +563,9 @@ export default async function AdminPage() {
         {/* ================================================== */}
 
         <ShareSection
-          bookUrl={bookUrl}
+          bookUrl={
+            bookUrl
+          }
         />
 
         {/* ================================================== */}
@@ -542,8 +590,7 @@ export default async function AdminPage() {
               href="/api/auth/google"
               className="btn-primary w-full text-center"
             >
-              Google Calendar
-              연결하기
+              Google Calendar 연결하기
             </a>
           </div>
         </section>
