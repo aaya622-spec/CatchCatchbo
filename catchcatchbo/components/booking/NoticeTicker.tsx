@@ -2,7 +2,7 @@
 
 export default function NoticeTicker() {
   const notice =
-    "📢 8월까지 가능한 날짜 오픈 완료! 매달 초에 다음 달 일정이 새로 열려요.";
+    "📢 10월까지 가능한 날짜 오픈 완료! 10월 말 일정이 새로 열려요.";
 
   return (
     <section
