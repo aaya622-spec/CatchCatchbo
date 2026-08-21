@@ -485,13 +485,18 @@ export async function acceptProposal(
   }
 
   const slotId =
-    randomUUID();
+  randomUUID();
 
-  const bookingId =
-    randomUUID();
+const bookingId =
+  randomUUID();
 
-  const now =
-    new Date().toISOString();
+// 예약자가 나중에 자신의 예약을
+// 조회/변경할 때 사용할 비밀 토큰
+const manageToken =
+  randomUUID();
+
+const now =
+  new Date().toISOString();
 
   // ============================================================
   // 확정 일정 생성
@@ -596,14 +601,17 @@ export async function acceptProposal(
   } = await supabase
     .from("bookings")
     .insert({
-      id:
-        bookingId,
+  id:
+    bookingId,
 
-      slot_id:
-        slotId,
+  slot_id:
+    slotId,
 
-      guest_name:
-        proposal.guest_name,
+  manage_token:
+    manageToken,
+
+  guest_name:
+    proposal.guest_name,
 
       guest_contact:
         proposal.guest_contact,
@@ -657,15 +665,18 @@ export async function acceptProposal(
   // Booking 객체
   // ============================================================
 
-  const booking: Booking = {
-    id:
-      bookingId,
+ const booking: Booking = {
+  id:
+    bookingId,
 
-    slot_id:
-      slotId,
+  slot_id:
+    slotId,
 
-    guest_name:
-      proposal.guest_name,
+  manage_token:
+    manageToken,
+
+  guest_name:
+    proposal.guest_name,
 
     guest_contact:
       proposal.guest_contact,
