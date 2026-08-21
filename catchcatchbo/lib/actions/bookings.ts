@@ -92,12 +92,13 @@ async function sendBookingRequestEmail(
 관리자 페이지:
 ${adminUrl}`;
 
-  const { error } = await resend.emails.send({
-    from: RESEND_FROM_EMAIL,
-    to: ADMIN_NOTIFICATION_EMAIL,
-    subject,
-    text,
-  });
+  const { error } =
+    await resend.emails.send({
+      from: RESEND_FROM_EMAIL,
+      to: ADMIN_NOTIFICATION_EMAIL,
+      subject,
+      text,
+    });
 
   if (error) {
     console.error(
@@ -313,11 +314,25 @@ export async function createBooking(
   const bookingId =
     randomUUID();
 
+  /**
+   * 예약자가 자기 예약을 관리할 때 사용할
+   * 비밀 토큰.
+   *
+   * 비로그인 사용자가 bookings SELECT를 할 수 없으므로
+   * DB insert 후 토큰을 다시 조회하지 않고
+   * 서버에서 직접 생성해서 저장합니다.
+   */
+  const manageToken =
+    randomUUID();
+
   const createdAt =
     new Date().toISOString();
 
   /**
    * 예약 생성
+   *
+   * 비로그인 사용자는 bookings SELECT 권한이 없으므로
+   * insert 후 select를 실행하지 않습니다.
    */
   const { error: insertError } =
     await supabase
@@ -325,6 +340,9 @@ export async function createBooking(
       .insert({
         id: bookingId,
         slot_id: slotId,
+
+        manage_token:
+          manageToken,
 
         guest_name:
           guestName,
@@ -380,6 +398,9 @@ export async function createBooking(
 
     slot_id:
       slotId,
+
+    manage_token:
+      manageToken,
 
     guest_name:
       guestName,
@@ -496,6 +517,7 @@ export async function confirmBooking(
     .select(`
       id,
       slot_id,
+      manage_token,
       guest_name,
       guest_contact,
       booking_title,
@@ -590,6 +612,7 @@ export async function confirmBooking(
     .select(`
       id,
       slot_id,
+      manage_token,
       guest_name,
       guest_contact,
       booking_title,
