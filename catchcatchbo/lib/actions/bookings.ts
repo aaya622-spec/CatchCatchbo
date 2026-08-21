@@ -237,6 +237,7 @@ export async function createBooking(
       id,
       is_active,
       date,
+      end_date,
       start_time,
       end_time,
       title,
@@ -287,11 +288,6 @@ export async function createBooking(
 
   /**
    * 현재는 기존 max_guests 로직 유지
-   *
-   * 신청자가 선택하는 guest_count는
-   * 실제 함께 오는 인원 정보이고,
-   * 기존 슬롯의 예약 가능 여부 로직은
-   * 다음 단계에서 따로 정리합니다.
    */
   const { count } =
     await supabase
@@ -322,9 +318,6 @@ export async function createBooking(
 
   /**
    * 예약 생성
-   *
-   * 비로그인 사용자는 bookings SELECT 권한이 없으므로
-   * insert 후 select를 실행하지 않습니다.
    */
   const { error: insertError } =
     await supabase
@@ -418,6 +411,10 @@ export async function createBooking(
       date:
         slot.date,
 
+      end_date:
+        slot.end_date ??
+        slot.date,
+
       start_time:
         slot.start_time,
 
@@ -455,11 +452,6 @@ export async function createBooking(
 
 /**
  * 관리자가 예약 확정
- *
- * 1. 예약 정보 조회
- * 2. Google Calendar 일정 생성
- * 3. 예약 상태를 confirmed로 변경
- * 4. Calendar 이벤트 ID 저장
  */
 export async function confirmBooking(
   bookingId: string
@@ -516,6 +508,7 @@ export async function confirmBooking(
       google_calendar_event_id,
       available_slots (
         date,
+        end_date,
         start_time,
         end_time,
         title,
@@ -609,6 +602,7 @@ export async function confirmBooking(
       google_calendar_event_id,
       available_slots (
         date,
+        end_date,
         start_time,
         end_time,
         title,
@@ -669,9 +663,6 @@ export async function confirmBooking(
 
 /**
  * 관리자가 예약 거절 또는 취소
- *
- * 확정된 예약에 Google Calendar 이벤트가 있으면
- * Calendar에서도 함께 삭제합니다.
  */
 export async function cancelBooking(
   bookingId: string
@@ -797,10 +788,6 @@ export async function cancelBooking(
         );
       }
     } catch (calendarError) {
-      /**
-       * 캘린더 삭제 실패가
-       * 예약 취소 자체를 되돌리지는 않음
-       */
       console.error(
         "Google Calendar delete error:",
         calendarError
