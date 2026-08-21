@@ -139,6 +139,25 @@ const guestContact =
     ""
   );
 
+  if (!guestContact) {
+  return {
+    success: false,
+    error:
+      "연락처를 입력해주세요.",
+  };
+}
+
+if (
+  guestContact.length < 10 ||
+  guestContact.length > 11
+) {
+  return {
+    success: false,
+    error:
+      "연락처를 정확하게 입력해주세요.",
+  };
+}
+
   const bookingTitle =
     (
       formData.get(
