@@ -93,10 +93,6 @@ export async function createProposalChangeRequest(
       ) as string
     )?.trim() || null;
 
-  // ============================================================
-  // 입력값 검증
-  // ============================================================
-
   if (!bookingTitle) {
     return {
       success: false,
@@ -192,10 +188,6 @@ export async function createProposalChangeRequest(
   const supabase =
     createAdminClient();
 
-  // ============================================================
-  // manage_token으로 원본 제안 확인
-  // ============================================================
-
   const {
     data: proposal,
     error: proposalError,
@@ -248,10 +240,6 @@ export async function createProposalChangeRequest(
     };
   }
 
-  // ============================================================
-  // 기존 pending 변경 요청 확인
-  // ============================================================
-
   const {
     data: existingRequest,
     error:
@@ -293,10 +281,6 @@ export async function createProposalChangeRequest(
         "이미 확인 중인 변경 요청이 있어요.",
     };
   }
-
-  // ============================================================
-  // 변경 요청 저장
-  // ============================================================
 
   const changeRequestId =
     randomUUID();
@@ -347,11 +331,6 @@ export async function createProposalChangeRequest(
         "변경 요청을 보내는 중 오류가 발생했어요.",
     };
   }
-
-  // ============================================================
-  // 관리자 이메일 알림
-  // 메일 실패는 변경 요청 실패로 처리하지 않음
-  // ============================================================
 
   if (
     resend &&
@@ -442,6 +421,278 @@ ${adminUrl}`;
 
   revalidatePath(
     "/admin"
+  );
+
+  return {
+    success: true,
+  };
+}
+
+// ============================================================
+// 관리자가 변경 요청 수락
+// ============================================================
+
+export async function acceptProposalChangeRequest(
+  requestId: string
+): Promise<ActionResult> {
+  if (!requestId) {
+    return {
+      success: false,
+      error:
+        "변경 요청 정보가 올바르지 않아요.",
+    };
+  }
+
+  const supabase =
+    createAdminClient();
+
+  const {
+    data: request,
+    error: requestError,
+  } = await supabase
+    .from(
+      "proposal_change_requests"
+    )
+    .select(`
+      id,
+      proposal_id,
+      booking_title,
+      proposed_date,
+      proposed_end_date,
+      guest_count,
+      meeting_type,
+      note,
+      status
+    `)
+    .eq(
+      "id",
+      requestId
+    )
+    .eq(
+      "status",
+      "pending"
+    )
+    .single();
+
+  if (
+    requestError ||
+    !request
+  ) {
+    console.error(
+      "Proposal change request lookup error:",
+      requestError
+    );
+
+    return {
+      success: false,
+      error:
+        "처리할 변경 요청을 찾을 수 없어요.",
+    };
+  }
+
+  const {
+    data: proposal,
+    error: proposalError,
+  } = await supabase
+    .from(
+      "date_proposals"
+    )
+    .select(`
+      id,
+      status
+    `)
+    .eq(
+      "id",
+      request.proposal_id
+    )
+    .single();
+
+  if (
+    proposalError ||
+    !proposal
+  ) {
+    return {
+      success: false,
+      error:
+        "원래 날짜 제안을 찾을 수 없어요.",
+    };
+  }
+
+  if (
+    proposal.status !==
+    "pending"
+  ) {
+    return {
+      success: false,
+      error:
+        "이미 처리된 날짜 제안이에요.",
+    };
+  }
+
+  // 원본 날짜 제안에 변경 내용 반영
+  const {
+    error: updateProposalError,
+  } = await supabase
+    .from(
+      "date_proposals"
+    )
+    .update({
+      booking_title:
+        request.booking_title,
+
+      proposed_date:
+        request.proposed_date,
+
+      proposed_end_date:
+        request.proposed_end_date,
+
+      guest_count:
+        request.guest_count,
+
+      meeting_type:
+        request.meeting_type,
+
+      note:
+        request.note,
+    })
+    .eq(
+      "id",
+      request.proposal_id
+    )
+    .eq(
+      "status",
+      "pending"
+    );
+
+  if (
+    updateProposalError
+  ) {
+    console.error(
+      "Proposal change apply error:",
+      updateProposalError
+    );
+
+    return {
+      success: false,
+      error:
+        "변경 내용을 적용하지 못했어요.",
+    };
+  }
+
+  // 요청 수락 처리
+  const {
+    error: acceptError,
+  } = await supabase
+    .from(
+      "proposal_change_requests"
+    )
+    .update({
+      status:
+        "accepted",
+
+      resolved_at:
+        new Date().toISOString(),
+
+      updated_at:
+        new Date().toISOString(),
+    })
+    .eq(
+      "id",
+      requestId
+    )
+    .eq(
+      "status",
+      "pending"
+    );
+
+  if (acceptError) {
+    console.error(
+      "Proposal change accept error:",
+      acceptError
+    );
+
+    return {
+      success: false,
+      error:
+        "변경 요청 처리 중 오류가 발생했어요.",
+    };
+  }
+
+  revalidatePath(
+    "/admin"
+  );
+
+  revalidatePath(
+    "/book"
+  );
+
+  return {
+    success: true,
+  };
+}
+
+// ============================================================
+// 관리자가 변경 요청 거절
+// ============================================================
+
+export async function rejectProposalChangeRequest(
+  requestId: string
+): Promise<ActionResult> {
+  if (!requestId) {
+    return {
+      success: false,
+      error:
+        "변경 요청 정보가 올바르지 않아요.",
+    };
+  }
+
+  const supabase =
+    createAdminClient();
+
+  const {
+    error,
+  } = await supabase
+    .from(
+      "proposal_change_requests"
+    )
+    .update({
+      status:
+        "rejected",
+
+      resolved_at:
+        new Date().toISOString(),
+
+      updated_at:
+        new Date().toISOString(),
+    })
+    .eq(
+      "id",
+      requestId
+    )
+    .eq(
+      "status",
+      "pending"
+    );
+
+  if (error) {
+    console.error(
+      "Proposal change reject error:",
+      error
+    );
+
+    return {
+      success: false,
+      error:
+        "변경 요청을 거절하지 못했어요.",
+    };
+  }
+
+  revalidatePath(
+    "/admin"
+  );
+
+  revalidatePath(
+    "/book"
   );
 
   return {
