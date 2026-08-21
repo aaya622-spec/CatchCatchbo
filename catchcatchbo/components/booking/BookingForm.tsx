@@ -4,6 +4,7 @@ import {
   useState,
   useTransition,
 } from "react";
+import Link from "next/link";
 import {
   Input,
   Textarea,
@@ -186,13 +187,20 @@ function CompletionScreen({
         </div>
       </div>
 
-      <p className="text-xs text-warm-gray-300 mt-6">
-        아직 확정 전이에요. 확정되면
-        따로 알려드릴게요 😊
+     {/* 내 예약 관리 */}
+      <Link
+        href={`/book/manage/${booking.manage_token}`}
+        className="btn-secondary w-full text-center mt-5"
+      >
+        내 예약 확인 / 변경하기
+      </Link>
+
+      <p className="text-xs text-warm-gray-300 mt-4">
+        이 링크에서 예약 내용을 확인하거나
+        변경할 수 있어요.
+        <br />
+        링크를 잃어버리지 않게 저장해주세요 😊
       </p>
-    </div>
-  );
-}
 
 // ============================================================
 // 예약 신청 폼
