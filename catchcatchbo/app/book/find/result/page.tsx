@@ -6,8 +6,7 @@ import {
   getLocationLabel,
 } from "@/lib/utils";
 
-export const dynamic =
-  "force-dynamic";
+export const dynamic = "force-dynamic";
 
 interface FindBookingResultPageProps {
   searchParams: Promise<{
@@ -108,6 +107,10 @@ export default async function FindBookingResultPage({
       params.contact ?? ""
     );
 
+  // ============================================================
+  // 잘못된 직접 접근
+  // ============================================================
+
   if (!name || !contact) {
     return (
       <div className="min-h-screen px-5 py-10">
@@ -139,33 +142,38 @@ export default async function FindBookingResultPage({
     createAdminClient();
 
   // ============================================================
-  // 일반 예약
+  // 일반 예약 조회
   // ============================================================
 
   const {
-  data: proposalRows,
-  error: proposalError,
-} = await supabase
-  .from("date_proposals")
-  .select(`
-    id,
-    manage_token,
-    guest_name,
-    guest_contact,
-    booking_title,
-    guest_count,
-    meeting_type,
-    proposed_date,
-    proposed_end_date,
-    status,
-    created_at
-  `)
-  .eq("guest_name", name)
-  .order("created_at", {
-    ascending: false,
-  });
+    data: bookingRows,
+    error: bookingError,
+  } = await supabase
+    .from("bookings")
+    .select(`
+      id,
+      manage_token,
+      guest_name,
+      guest_contact,
+      booking_title,
+      guest_count,
+      meeting_type,
+      status,
+      created_at,
+      available_slots (
+        date,
+        end_date,
+        title,
+        location_text
+      )
+    `)
+    .eq("guest_name", name)
+    .order("created_at", {
+      ascending: false,
+    });
+
   // ============================================================
-  // 날짜 제안
+  // 날짜 제안 조회
   // ============================================================
 
   const {
@@ -175,6 +183,7 @@ export default async function FindBookingResultPage({
     .from("date_proposals")
     .select(`
       id,
+      manage_token,
       guest_name,
       guest_contact,
       booking_title,
@@ -189,6 +198,10 @@ export default async function FindBookingResultPage({
     .order("created_at", {
       ascending: false,
     });
+
+  // ============================================================
+  // 오류 처리
+  // ============================================================
 
   if (
     bookingError ||
@@ -215,6 +228,10 @@ export default async function FindBookingResultPage({
             예약을 불러오지 못했어요
           </h1>
 
+          <p className="text-sm text-warm-gray-500 mt-2">
+            잠시 후 다시 시도해주세요.
+          </p>
+
           <Link
             href="/book/find"
             className="btn-secondary w-full text-center mt-6"
@@ -225,6 +242,10 @@ export default async function FindBookingResultPage({
       </div>
     );
   }
+
+  // ============================================================
+  // 연락처 정규화 후 필터링
+  // ============================================================
 
   const bookings =
     (bookingRows ?? []).filter(
@@ -242,7 +263,7 @@ export default async function FindBookingResultPage({
         ) === contact
     );
 
-  // 수락된 제안은 이미 bookings에 생성되므로 중복 숨김
+  // 수락된 제안은 이미 실제 bookings에 생성되므로 중복 표시 안 함
   const visibleProposals =
     proposals.filter(
       (proposal) =>
@@ -254,6 +275,10 @@ export default async function FindBookingResultPage({
     bookings.length > 0 ||
     visibleProposals.length > 0;
 
+  // ============================================================
+  // 화면
+  // ============================================================
+
   return (
     <div className="min-h-screen pb-20">
       <header className="px-5 pt-8 pb-5">
@@ -261,7 +286,8 @@ export default async function FindBookingResultPage({
           href="/book/find"
           className="inline-flex items-center gap-2 text-sm text-warm-gray-500"
         >
-          ← 다시 검색하기
+          <span>←</span>
+          <span>다시 검색하기</span>
         </Link>
       </header>
 
@@ -290,8 +316,9 @@ export default async function FindBookingResultPage({
               일치하는 약속이 없어요
             </p>
 
-            <p className="text-sm text-warm-gray-400 mt-2">
-              이름과 연락처를 다시 확인해주세요.
+            <p className="text-sm text-warm-gray-400 mt-2 leading-relaxed">
+              신청할 때 입력한 이름과 연락처가 맞는지
+              확인해주세요.
             </p>
 
             <Link
@@ -303,7 +330,11 @@ export default async function FindBookingResultPage({
           </div>
         ) : (
           <div className="flex flex-col gap-6">
+
+            {/* ================================================== */}
             {/* 날짜 제안 */}
+            {/* ================================================== */}
+
             {visibleProposals.length >
               0 && (
               <section>
@@ -325,9 +356,15 @@ export default async function FindBookingResultPage({
                           className="card p-5"
                         >
                           <div className="flex items-start justify-between gap-3">
-                            <h3 className="font-bold text-warm-gray-800">
-                              {proposal.booking_title}
-                            </h3>
+                            <div>
+                              <p className="text-xs text-warm-gray-400 mb-1">
+                                약속 이름
+                              </p>
+
+                              <h3 className="font-bold text-warm-gray-800">
+                                {proposal.booking_title}
+                              </h3>
+                            </div>
 
                             <span
                               className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${status.className}`}
@@ -353,35 +390,34 @@ export default async function FindBookingResultPage({
                             </p>
 
                             <p className="text-sm text-warm-gray-500">
-                              👥{" "}
-                              {proposal.guest_count}
-                              명
+                              👥 {proposal.guest_count}명
                             </p>
                           </div>
 
                           {proposal.status ===
                             "pending" && (
-                            <div className="mt-4 rounded-xl bg-amber-50 px-3 py-3">
-                              <p className="text-xs text-amber-600">
-                                아직 관리자가 확인하기 전이에요.
-                              </p>
-                            </div>
-                          )}
+                            <>
+                              <div className="mt-4 rounded-xl bg-amber-50 px-3 py-3">
+                                <p className="text-xs text-amber-600 leading-relaxed">
+                                  아직 관리자가 확인하기 전이에요.
+                                </p>
+                              </div>
 
-                          {proposal.status === "pending" &&
-  proposal.manage_token && (
-    <Link
-      href={`/book/proposal/manage/${proposal.manage_token}`}
-      className="btn-primary w-full text-center mt-4"
-    >
-      확인 / 변경하기
-    </Link>
-  )}
+                              {proposal.manage_token && (
+                                <Link
+                                  href={`/book/proposal/manage/${proposal.manage_token}`}
+                                  className="btn-primary w-full text-center mt-4"
+                                >
+                                  확인 / 변경하기
+                                </Link>
+                              )}
+                            </>
+                          )}
 
                           {proposal.status ===
                             "rejected" && (
                             <div className="mt-4 rounded-xl bg-red-50 px-3 py-3">
-                              <p className="text-xs text-red-500">
+                              <p className="text-xs text-red-500 leading-relaxed">
                                 아쉽지만 이 날짜는 만나기 어려워요.
                               </p>
                             </div>
@@ -394,7 +430,10 @@ export default async function FindBookingResultPage({
               </section>
             )}
 
+            {/* ================================================== */}
             {/* 실제 예약 */}
+            {/* ================================================== */}
+
             {bookings.length >
               0 && (
               <section>
@@ -426,9 +465,15 @@ export default async function FindBookingResultPage({
                           className="card p-5"
                         >
                           <div className="flex items-start justify-between gap-3">
-                            <h3 className="font-bold text-warm-gray-800">
-                              {booking.booking_title}
-                            </h3>
+                            <div>
+                              <p className="text-xs text-warm-gray-400 mb-1">
+                                약속 이름
+                              </p>
+
+                              <h3 className="font-bold text-warm-gray-800">
+                                {booking.booking_title}
+                              </h3>
+                            </div>
 
                             <span
                               className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${status.className}`}
@@ -455,9 +500,14 @@ export default async function FindBookingResultPage({
                               </p>
 
                               <p className="text-sm text-warm-gray-500">
-                                👥{" "}
-                                {booking.guest_count}
-                                명
+                                💬{" "}
+                                {getMeetingTypeLabel(
+                                  booking.meeting_type
+                                )}
+                              </p>
+
+                              <p className="text-sm text-warm-gray-500">
+                                👥 {booking.guest_count}명
                               </p>
                             </div>
                           )}
