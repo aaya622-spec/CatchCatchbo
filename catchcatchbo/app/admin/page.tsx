@@ -23,7 +23,10 @@ export const dynamic = "force-dynamic";
 type RawAdminSlot = {
   id: string;
   owner_id: string;
+
   date: string;
+  end_date: string | null;
+
   start_time: string;
   end_time: string;
 
@@ -119,6 +122,12 @@ export default async function AdminPage() {
 
       date: slot.date,
 
+      // 여러 날짜 일정
+      // end_date가 없으면 시작 날짜와 동일하게 처리
+      end_date:
+        slot.end_date ??
+        slot.date,
+
       start_time:
         slot.start_time,
 
@@ -198,6 +207,7 @@ export default async function AdminPage() {
         *,
         available_slots (
           date,
+          end_date,
           start_time,
           end_time,
           title,
@@ -455,8 +465,8 @@ export default async function AdminPage() {
               </p>
 
               <p className="text-sm text-warm-gray-400 mt-1">
-                가능한 날짜와
-                시간을 등록해보세요!
+                가능한 날짜를
+                등록해보세요!
               </p>
 
               <Link
