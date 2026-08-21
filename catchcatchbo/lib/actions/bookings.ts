@@ -3,6 +3,7 @@
 import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import {
   resend,
   ADMIN_NOTIFICATION_EMAIL,
@@ -127,36 +128,36 @@ export async function createBooking(
     )?.trim();
 
   const rawGuestContact =
-  (
-    formData.get(
-      "guest_contact"
-    ) as string
-  )?.trim() || "";
+    (
+      formData.get(
+        "guest_contact"
+      ) as string
+    )?.trim() || "";
 
-const guestContact =
-  rawGuestContact.replace(
-    /[^0-9]/g,
-    ""
-  );
+  const guestContact =
+    rawGuestContact.replace(
+      /[^0-9]/g,
+      ""
+    );
 
   if (!guestContact) {
-  return {
-    success: false,
-    error:
-      "연락처를 입력해주세요.",
-  };
-}
+    return {
+      success: false,
+      error:
+        "연락처를 입력해주세요.",
+    };
+  }
 
-if (
-  guestContact.length < 10 ||
-  guestContact.length > 11
-) {
-  return {
-    success: false,
-    error:
-      "연락처를 정확하게 입력해주세요.",
-  };
-}
+  if (
+    guestContact.length < 10 ||
+    guestContact.length > 11
+  ) {
+    return {
+      success: false,
+      error:
+        "연락처를 정확하게 입력해주세요.",
+    };
+  }
 
   const bookingTitle =
     (
@@ -248,8 +249,14 @@ if (
     };
   }
 
+  /**
+   * 중요:
+   * 비로그인 사용자의 예약 생성은
+   * RLS 영향 없이 서버에서만 처리하기 위해
+   * admin client 사용
+   */
   const supabase =
-    await createClient();
+    createAdminClient();
 
   /**
    * 선택한 일정 확인
@@ -313,7 +320,7 @@ if (
   }
 
   /**
-   * 현재는 기존 max_guests 로직 유지
+   * 기존 max_guests 로직 유지
    */
   const { count } =
     await supabase
@@ -341,11 +348,7 @@ if (
 
   /**
    * 예약자가 자기 예약을 관리할 때 사용할
-   * 비밀 토큰.
-   *
-   * 비로그인 사용자가 bookings SELECT를 할 수 없으므로
-   * DB insert 후 토큰을 다시 조회하지 않고
-   * 서버에서 직접 생성해서 저장합니다.
+   * 비밀 토큰
    */
   const manageToken =
     randomUUID();
@@ -355,16 +358,15 @@ if (
 
   /**
    * 예약 생성
-   *
-   * 비로그인 사용자는 bookings SELECT 권한이 없으므로
-   * insert 후 select를 실행하지 않습니다.
    */
   const { error: insertError } =
     await supabase
       .from("bookings")
       .insert({
         id: bookingId,
-        slot_id: slotId,
+
+        slot_id:
+          slotId,
 
         manage_token:
           manageToken,
@@ -386,7 +388,8 @@ if (
 
         note,
 
-        status: "pending",
+        status:
+          "pending",
 
         created_at:
           createdAt,
@@ -407,7 +410,7 @@ if (
               "지난 날짜"
             )
           ? "이미 지난 날짜예요."
-          : "예약 신청 중 오류가 발생했어요. 다시 시도해주세요.";
+          : `예약 신청 중 오류가 발생했어요. ${insertError.message}`;
 
     return {
       success: false,
@@ -419,7 +422,8 @@ if (
    * 예약 완료 화면 / 메일에서 사용할 Booking 객체
    */
   const booking: Booking = {
-    id: bookingId,
+    id:
+      bookingId,
 
     slot_id:
       slotId,
@@ -490,6 +494,7 @@ if (
 
   return {
     success: true,
+
     data: {
       booking,
     },
@@ -506,6 +511,9 @@ export async function confirmBooking(
     booking: Booking;
   }>
 > {
+  /**
+   * 관리자 기능은 기존 로그인 기반 client 유지
+   */
   const supabase =
     await createClient();
 
@@ -702,6 +710,7 @@ export async function confirmBooking(
 
   return {
     success: true,
+
     data: {
       booking:
         confirmedBooking as unknown as Booking,
@@ -715,6 +724,9 @@ export async function confirmBooking(
 export async function cancelBooking(
   bookingId: string
 ): Promise<ActionResult> {
+  /**
+   * 관리자 기능은 기존 로그인 기반 client 유지
+   */
   const supabase =
     await createClient();
 
@@ -827,7 +839,10 @@ export async function cancelBooking(
             google_calendar_event_id:
               null,
           })
-          .eq("id", bookingId);
+          .eq(
+            "id",
+            bookingId
+          );
 
       if (clearError) {
         console.error(
