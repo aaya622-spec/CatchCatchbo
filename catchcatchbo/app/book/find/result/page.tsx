@@ -143,28 +143,27 @@ export default async function FindBookingResultPage({
   // ============================================================
 
   const {
-    data: bookingRows,
-    error: bookingError,
-  } = await supabase
-    .from("bookings")
-    .select(`
-  id,
-  manage_token,
-  guest_name,
-  guest_contact,
-  booking_title,
-  guest_count,
-  meeting_type,
-  proposed_date,
-  proposed_end_date,
-  status,
-  created_at
-`)
-    .eq("guest_name", name)
-    .order("created_at", {
-      ascending: false,
-    });
-
+  data: proposalRows,
+  error: proposalError,
+} = await supabase
+  .from("date_proposals")
+  .select(`
+    id,
+    manage_token,
+    guest_name,
+    guest_contact,
+    booking_title,
+    guest_count,
+    meeting_type,
+    proposed_date,
+    proposed_end_date,
+    status,
+    created_at
+  `)
+  .eq("guest_name", name)
+  .order("created_at", {
+    ascending: false,
+  });
   // ============================================================
   // 날짜 제안
   // ============================================================
