@@ -215,6 +215,31 @@ export default async function BookPage() {
             </Link>
           </div>
         </section>
+
+        <section className="mt-4">
+  <div className="card p-5 text-center">
+    <div className="text-3xl mb-3">
+      🔎
+    </div>
+
+    <h2 className="font-semibold text-warm-gray-700">
+      이미 신청한 약속이 있나요?
+    </h2>
+
+    <p className="text-sm text-warm-gray-400 mt-2 leading-relaxed">
+      예약할 때 입력한 이름과 연락처로
+      <br />
+      내 예약을 확인하거나 변경할 수 있어요.
+    </p>
+
+    <Link
+      href="/book/find"
+      className="btn-secondary w-full text-center mt-4"
+    >
+      내 예약 확인 / 변경하기
+    </Link>
+  </div>
+</section>
       </main>
 
       {/* ====================================================== */}
