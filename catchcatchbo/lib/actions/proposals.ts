@@ -1,38 +1,38 @@
-"use server";
-
-import { randomUUID } from "crypto";
-import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
-import {
-  resend,
-  ADMIN_NOTIFICATION_EMAIL,
-  RESEND_FROM_EMAIL,
-} from "@/lib/mail/resend";
-import {
-  createGoogleCalendarEvent,
-  deleteGoogleCalendarEvent,
-} from "@/lib/google/calendar";
+import Link from "next/link";
+import { createAdminClient } from "@/lib/supabase/admin";
 import {
   formatKoreanDate,
   getMeetingTypeLabel,
+  getLocationLabel,
 } from "@/lib/utils";
-import type {
-  ActionResult,
-  Booking,
-  DateProposal,
-} from "@/lib/types";
 
-// ============================================================
-// 날짜 범위 표시
-// ============================================================
+export const dynamic = "force-dynamic";
+
+interface FindBookingResultPageProps {
+  searchParams: Promise<{
+    name?: string;
+    contact?: string;
+  }>;
+}
+
+function normalizeContact(
+  value: string
+): string {
+  return value.replace(
+    /[^0-9]/g,
+    ""
+  );
+}
 
 function formatDateRange(
   startDate: string,
-  endDate: string
+  endDate?: string | null
 ): string {
+  const finalEndDate =
+    endDate || startDate;
+
   if (
-    !endDate ||
-    startDate === endDate
+    startDate === finalEndDate
   ) {
     return formatKoreanDate(
       startDate
@@ -42,1004 +42,547 @@ function formatDateRange(
   return `${formatKoreanDate(
     startDate
   )} ~ ${formatKoreanDate(
-    endDate
+    finalEndDate
   )}`;
 }
 
-// ============================================================
-// 친구가 날짜 제안
-// ============================================================
+function getBookingStatusInfo(
+  status: string
+) {
+  switch (status) {
+    case "confirmed":
+      return {
+        label: "약속 확정",
+        className:
+          "bg-green-50 text-green-600",
+      };
 
-export async function createProposal(
-  formData: FormData
-): Promise<ActionResult> {
-  const guestName = (
-    formData.get(
-      "guest_name"
-    ) as string
-  )?.trim();
+    case "canceled":
+      return {
+        label: "취소됨",
+        className:
+          "bg-red-50 text-red-500",
+      };
 
-  const guestContact =
-    (
-      formData.get(
-        "guest_contact"
-      ) as string
-    )?.trim() || null;
-
-  const bookingTitle = (
-    formData.get(
-      "booking_title"
-    ) as string
-  )?.trim();
-
-  // 시작일
-  const proposedDate = (
-    formData.get(
-      "proposed_date"
-    ) as string
-  )?.trim();
-
-  // 종료일
-  const proposedEndDate =
-    (
-      formData.get(
-        "proposed_end_date"
-      ) as string
-    )?.trim() ||
-    proposedDate;
-
-  /*
-   * 기존 DB 컬럼 호환용.
-   * 사용자가 더 이상 시간을 선택하지 않습니다.
-   */
-  const proposedTime =
-    "00:00";
-
-  const proposedEndTime =
-    "23:59";
-
-  const guestCount = Number(
-    formData.get(
-      "guest_count"
-    ) ?? 1
-  );
-
-  const meetingType = (
-    formData.get(
-      "meeting_type"
-    ) as string
-  )?.trim();
-
-  const note =
-    (
-      formData.get(
-        "note"
-      ) as string
-    )?.trim() || null;
-
-  // ============================================================
-  // 검증
-  // ============================================================
-
-  if (!guestName) {
-    return {
-      success: false,
-      error:
-        "이름을 입력해주세요.",
-    };
+    default:
+      return {
+        label: "확정 대기",
+        className:
+          "bg-amber-50 text-amber-600",
+      };
   }
-
-  if (
-    guestName.length > 20
-  ) {
-    return {
-      success: false,
-      error:
-        "이름은 20자 이내로 입력해주세요.",
-    };
-  }
-
-  if (!bookingTitle) {
-    return {
-      success: false,
-      error:
-        "약속 이름을 입력해주세요.",
-    };
-  }
-
-  if (
-    bookingTitle.length >
-    40
-  ) {
-    return {
-      success: false,
-      error:
-        "약속 이름은 40자 이내로 입력해주세요.",
-    };
-  }
-
-  if (!proposedDate) {
-    return {
-      success: false,
-      error:
-        "희망 시작일을 선택해주세요.",
-    };
-  }
-
-  if (
-    !proposedEndDate
-  ) {
-    return {
-      success: false,
-      error:
-        "희망 종료일을 선택해주세요.",
-    };
-  }
-
-  if (
-    proposedEndDate <
-    proposedDate
-  ) {
-    return {
-      success: false,
-      error:
-        "종료일은 시작일보다 빠를 수 없어요.",
-    };
-  }
-
-  if (
-    !Number.isInteger(
-      guestCount
-    ) ||
-    guestCount < 1 ||
-    guestCount > 4
-  ) {
-    return {
-      success: false,
-      error:
-        "인원은 1명에서 4명까지 선택해주세요.",
-    };
-  }
-
-  if (!meetingType) {
-    return {
-      success: false,
-      error:
-        "약속 유형을 선택해주세요.",
-    };
-  }
-
-  const todayKST =
-    new Intl.DateTimeFormat(
-      "en-CA",
-      {
-        timeZone:
-          "Asia/Seoul",
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-      }
-    ).format(
-      new Date()
-    );
-
-  if (
-    proposedDate <
-    todayKST
-  ) {
-    return {
-      success: false,
-      error:
-        "지난 날짜는 제안할 수 없어요.",
-    };
-  }
-
-  // ============================================================
-  // DB 저장
-  // ============================================================
-
-  const supabase =
-    await createClient();
-
-  const {
-    error: insertError,
-  } = await supabase
-    .from(
-      "date_proposals"
-    )
-    .insert({
-      id:
-        randomUUID(),
-
-      guest_name:
-        guestName,
-
-      guest_contact:
-        guestContact,
-
-      // 시작일
-      proposed_date:
-        proposedDate,
-
-      // 종료일
-      proposed_end_date:
-        proposedEndDate,
-
-      /*
-       * 기존 DB 호환용
-       */
-      proposed_time:
-        proposedTime,
-
-      proposed_end_time:
-        proposedEndTime,
-
-      booking_title:
-        bookingTitle,
-
-      guest_count:
-        guestCount,
-
-      meeting_type:
-        meetingType,
-
-      note,
-
-      status:
-        "pending",
-    });
-
-  if (insertError) {
-    console.error(
-      "createProposal error:",
-      insertError
-    );
-
-    return {
-      success: false,
-      error:
-        `DB 오류: ${insertError.message} / code: ${insertError.code}`,
-    };
-  }
-
-  // ============================================================
-  // 관리자 이메일 알림
-  // ============================================================
-
-  if (
-    resend &&
-    ADMIN_NOTIFICATION_EMAIL
-  ) {
-    const adminUrl =
-      `${
-        process.env
-          .NEXT_PUBLIC_SITE_URL ??
-        "https://catch-catchbo.vercel.app"
-      }/admin`;
-
-    const dateRange =
-      formatDateRange(
-        proposedDate,
-        proposedEndDate
-      );
-
-    const text = `새로운 날짜 제안이 들어왔어요.
-
-신청자: ${guestName}
-약속 이름: ${bookingTitle}
-인원: ${guestCount}명
-날짜: ${dateRange}
-약속 유형: ${getMeetingTypeLabel(
-      meetingType
-    )}
-연락처: ${
-      guestContact ||
-      "입력하지 않음"
-    }
-메모: ${
-      note ||
-      "입력하지 않음"
-    }
-
-관리자 페이지:
-${adminUrl}`;
-
-    const {
-      error: mailError,
-    } =
-      await resend.emails.send(
-        {
-          from:
-            RESEND_FROM_EMAIL,
-
-          to:
-            ADMIN_NOTIFICATION_EMAIL,
-
-          subject:
-            `[캐치캐치보] ${guestName}님의 날짜 제안`,
-
-          text,
-        }
-      );
-
-    if (mailError) {
-      console.error(
-        "Proposal email error:",
-        mailError
-      );
-    }
-  }
-
-  revalidatePath(
-    "/admin"
-  );
-
-  return {
-    success: true,
-  };
 }
 
-// ============================================================
-// 관리자가 날짜 제안 수락
-// ============================================================
+function getProposalStatusInfo(
+  status: string
+) {
+  switch (status) {
+    case "accepted":
+      return {
+        label: "제안 수락",
+        className:
+          "bg-green-50 text-green-600",
+      };
 
-export async function acceptProposal(
-  proposalId: string
-): Promise<
-  ActionResult<{
-    proposal: DateProposal;
-    booking: Booking;
-  }>
-> {
+    case "rejected":
+      return {
+        label: "제안 거절",
+        className:
+          "bg-red-50 text-red-500",
+      };
+
+    default:
+      return {
+        label: "제안 확인 중",
+        className:
+          "bg-amber-50 text-amber-600",
+      };
+  }
+}
+
+export default async function FindBookingResultPage({
+  searchParams,
+}: FindBookingResultPageProps) {
+  const params =
+    await searchParams;
+
+  const name =
+    params.name?.trim() ?? "";
+
+  const contact =
+    normalizeContact(
+      params.contact ?? ""
+    );
+
+  if (
+    !name ||
+    !contact
+  ) {
+    return (
+      <div className="min-h-screen px-5 py-10">
+        <div className="card p-6 text-center">
+          <p className="text-4xl mb-4">
+            🔎
+          </p>
+
+          <h1 className="text-xl font-bold text-warm-gray-800">
+            예약 정보를 입력해주세요
+          </h1>
+
+          <p className="text-sm text-warm-gray-500 mt-2">
+            이름과 연락처가 모두
+            필요해요.
+          </p>
+
+          <Link
+            href="/book/find"
+            className="btn-secondary w-full text-center mt-6"
+          >
+            다시 입력하기
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   const supabase =
-    await createClient();
-
-  const {
-    data: { user },
-    error: authError,
-  } =
-    await supabase.auth.getUser();
-
-  if (
-    authError ||
-    !user
-  ) {
-    return {
-      success: false,
-      error:
-        "로그인이 필요해요.",
-    };
-  }
-
-  if (!proposalId) {
-    return {
-      success: false,
-      error:
-        "날짜 제안 정보가 올바르지 않아요.",
-    };
-  }
+    createAdminClient();
 
   // ============================================================
-  // 제안 조회
+  // 일반 예약 조회
   // ============================================================
 
   const {
-    data: proposal,
-    error:
-      proposalError,
-  } = await supabase
-    .from(
-      "date_proposals"
-    )
-    .select("*")
-    .eq(
-      "id",
-      proposalId
-    )
-    .eq(
-      "status",
-      "pending"
-    )
-    .single();
-
-  if (
-    proposalError ||
-    !proposal
-  ) {
-    console.error(
-      "acceptProposal lookup error:",
-      proposalError
-    );
-
-    return {
-      success: false,
-      error:
-        "수락할 날짜 제안을 찾을 수 없어요.",
-    };
-  }
-
-  const startDate =
-    proposal.proposed_date;
-
-  const endDate =
-    proposal.proposed_end_date ??
-    proposal.proposed_date;
-
-  if (!startDate) {
-    return {
-      success: false,
-      error:
-        "시작 날짜 정보가 없는 제안이에요.",
-    };
-  }
-
-  if (
-    endDate <
-    startDate
-  ) {
-    return {
-      success: false,
-      error:
-        "종료일이 시작일보다 빠른 제안이에요.",
-    };
-  }
-
-  const slotId =
-  randomUUID();
-
-const bookingId =
-  randomUUID();
-
-// 예약자가 나중에 자신의 예약을
-// 조회/변경할 때 사용할 비밀 토큰
-const manageToken =
-  randomUUID();
-
-const now =
-  new Date().toISOString();
-
-  // ============================================================
-  // 확정 일정 생성
-  // ============================================================
-
-  /*
-   * 제안 수락 시 새로운 available_slot을 생성합니다.
-   *
-   * is_active는 true로 유지합니다.
-   * 이후 confirmed 예약 1건이 연결되므로
-   * remaining = 0이 되어 공개 캘린더에서는
-   * 마감 일정으로 표시됩니다.
-   */
-
-  const {
-    error: slotError,
-  } = await supabase
-    .from(
-      "available_slots"
-    )
-    .insert({
-      id:
-        slotId,
-
-      owner_id:
-        user.id,
-
-      // 시작일
-      date:
-        startDate,
-
-      // 종료일
-      end_date:
-        endDate,
-
-      /*
-       * 기존 DB 및 Google Calendar 코드
-       * 호환용 시간값.
-       *
-       * 다음 단계에서 Calendar를
-       * 종일 일정 방식으로 변경합니다.
-       */
-      start_time:
-        "00:00",
-
-      end_time:
-        "23:59",
-
-      title:
-        proposal.booking_title,
-
-      meeting_type:
-        proposal.meeting_type,
-
-      description:
-        proposal.note,
-
-      location_text:
-        "tbd",
-
-      image_url:
-        null,
-
-      image_position:
-        "center",
-
-      image_text_color:
-        "dark",
-
-      max_guests:
-        1,
-
-      is_active:
-        true,
-
-      created_at:
-        now,
-
-      updated_at:
-        now,
-    });
-
-  if (slotError) {
-    console.error(
-      "Proposal slot create error:",
-      slotError
-    );
-
-    return {
-      success: false,
-      error:
-        `일정 생성 실패: ${slotError.message} / code: ${slotError.code}`,
-    };
-  }
-
-  // ============================================================
-  // 확정 예약 생성
-  // ============================================================
-
-  const {
+    data: bookingRows,
     error: bookingError,
   } = await supabase
     .from("bookings")
-    .insert({
-  id:
-    bookingId,
+    .select(`
+      id,
+      manage_token,
+      guest_name,
+      guest_contact,
+      booking_title,
+      guest_count,
+      meeting_type,
+      status,
+      created_at,
+      available_slots (
+        date,
+        end_date,
+        title,
+        location_text
+      )
+    `)
+    .eq(
+      "guest_name",
+      name
+    )
+    .order(
+      "created_at",
+      {
+        ascending: false,
+      }
+    );
 
-  slot_id:
-    slotId,
+  // ============================================================
+  // 날짜 제안 조회
+  // ============================================================
 
-  manage_token:
-    manageToken,
+  const {
+    data: proposalRows,
+    error: proposalError,
+  } = await supabase
+    .from("date_proposals")
+    .select(`
+      id,
+      guest_name,
+      guest_contact,
+      booking_title,
+      guest_count,
+      meeting_type,
+      proposed_date,
+      proposed_end_date,
+      status,
+      created_at
+    `)
+    .eq(
+      "guest_name",
+      name
+    )
+    .order(
+      "created_at",
+      {
+        ascending: false,
+      }
+    );
 
-  guest_name:
-    proposal.guest_name,
-
-      guest_contact:
-        proposal.guest_contact,
-
-      booking_title:
-        proposal.booking_title,
-
-      guest_count:
-        proposal.guest_count,
-
-      meeting_type:
-        proposal.meeting_type,
-
-      note:
-        proposal.note,
-
-      status:
-        "confirmed",
-
-      created_at:
-        now,
-
-      canceled_at:
-        null,
-    });
-
-  if (bookingError) {
+  if (
+    bookingError ||
+    proposalError
+  ) {
     console.error(
-      "Proposal booking create error:",
+      "Find booking error:",
       bookingError
     );
 
-    await supabase
-      .from(
-        "available_slots"
-      )
-      .delete()
-      .eq(
-        "id",
-        slotId
-      );
-
-    return {
-      success: false,
-      error:
-        `예약 생성 실패: ${bookingError.message} / code: ${bookingError.code}`,
-    };
-  }
-
-  // ============================================================
-  // Booking 객체
-  // ============================================================
-
- const booking: Booking = {
-  id:
-    bookingId,
-
-  slot_id:
-    slotId,
-
-  manage_token:
-    manageToken,
-
-  guest_name:
-    proposal.guest_name,
-
-    guest_contact:
-      proposal.guest_contact,
-
-    booking_title:
-      proposal.booking_title,
-
-    guest_count:
-      proposal.guest_count,
-
-    meeting_type:
-      proposal.meeting_type,
-
-    note:
-      proposal.note,
-
-    status:
-      "confirmed",
-
-    created_at:
-      now,
-
-    canceled_at:
-      null,
-
-    available_slots: {
-      // 시작일
-      date:
-        startDate,
-
-      // 종료일
-      end_date:
-        endDate,
-
-      // 기존 Calendar 호환용
-      start_time:
-        "00:00",
-
-      end_time:
-        "23:59",
-
-      title:
-        proposal.booking_title,
-
-      location_text:
-        "tbd",
-
-      meeting_type:
-        proposal.meeting_type,
-    },
-  };
-
-  // ============================================================
-  // Google Calendar 생성
-  // ============================================================
-
-  let calendarEventId:
-    string;
-
-  try {
-    calendarEventId =
-      await createGoogleCalendarEvent(
-        booking
-      );
-  } catch (
-    calendarError
-  ) {
     console.error(
-      "Proposal Google Calendar error:",
-      calendarError
+      "Find proposal error:",
+      proposalError
     );
 
-    await supabase
-      .from(
-        "bookings"
-      )
-      .delete()
-      .eq(
-        "id",
-        bookingId
-      );
+    return (
+      <div className="min-h-screen px-5 py-10">
+        <div className="card p-6 text-center">
+          <p className="text-4xl mb-4">
+            😢
+          </p>
 
-    await supabase
-      .from(
-        "available_slots"
-      )
-      .delete()
-      .eq(
-        "id",
-        slotId
-      );
+          <h1 className="text-xl font-bold text-warm-gray-800">
+            예약을 불러오지 못했어요
+          </h1>
 
-    return {
-      success: false,
-      error:
-        calendarError instanceof
-        Error
-          ? calendarError.message
-          : "Google Calendar 등록에 실패했어요.",
-    };
+          <p className="text-sm text-warm-gray-500 mt-2">
+            잠시 후 다시
+            시도해주세요.
+          </p>
+
+          <Link
+            href="/book/find"
+            className="btn-secondary w-full text-center mt-6"
+          >
+            다시 시도하기
+          </Link>
+        </div>
+      </div>
+    );
   }
 
-  // ============================================================
-  // Calendar Event ID 저장
-  // ============================================================
-
-  const {
-    error:
-      calendarIdError,
-  } = await supabase
-    .from("bookings")
-    .update({
-      google_calendar_event_id:
-        calendarEventId,
-    })
-    .eq(
-      "id",
-      bookingId
+  // 연락처 형식 통일 후 비교
+  const bookings =
+    (bookingRows ?? []).filter(
+      (booking) =>
+        normalizeContact(
+          booking.guest_contact ?? ""
+        ) === contact
     );
 
-  if (
-    calendarIdError
-  ) {
-    console.error(
-      "Proposal Calendar ID save error:",
-      calendarIdError
+  const proposals =
+    (proposalRows ?? []).filter(
+      (proposal) =>
+        normalizeContact(
+          proposal.guest_contact ?? ""
+        ) === contact
     );
-
-    try {
-      await deleteGoogleCalendarEvent(
-        calendarEventId
-      );
-    } catch (
-      deleteError
-    ) {
-      console.error(
-        "Proposal Calendar rollback error:",
-        deleteError
-      );
-    }
-
-    await supabase
-      .from(
-        "bookings"
-      )
-      .delete()
-      .eq(
-        "id",
-        bookingId
-      );
-
-    await supabase
-      .from(
-        "available_slots"
-      )
-      .delete()
-      .eq(
-        "id",
-        slotId
-      );
-
-    return {
-      success: false,
-      error:
-        `Google Calendar 정보 저장 실패: ${calendarIdError.message}`,
-    };
-  }
-
-  // ============================================================
-  // 날짜 제안 accepted 처리
-  // ============================================================
-
-  const {
-    data:
-      acceptedProposal,
-
-    error:
-      acceptError,
-  } = await supabase
-    .from(
-      "date_proposals"
-    )
-    .update({
-      status:
-        "accepted",
-    })
-    .eq(
-      "id",
-      proposalId
-    )
-    .eq(
-      "status",
-      "pending"
-    )
-    .select("*")
-    .single();
-
-  if (
-    acceptError ||
-    !acceptedProposal
-  ) {
-    console.error(
-      "Proposal accept status error:",
-      acceptError
-    );
-
-    try {
-      await deleteGoogleCalendarEvent(
-        calendarEventId
-      );
-    } catch (
-      deleteError
-    ) {
-      console.error(
-        "Proposal Calendar final rollback error:",
-        deleteError
-      );
-    }
-
-    await supabase
-      .from(
-        "bookings"
-      )
-      .delete()
-      .eq(
-        "id",
-        bookingId
-      );
-
-    await supabase
-      .from(
-        "available_slots"
-      )
-      .delete()
-      .eq(
-        "id",
-        slotId
-      );
-
-    return {
-      success: false,
-      error:
-        acceptError?.message ??
-        "날짜 제안 확정 처리에 실패했어요.",
-    };
-  }
 
   /*
-   * 슬롯을 비활성화하지 않습니다.
+   * accepted proposal은 이미 bookings에
+   * 실제 확정 예약이 생성되어 있으므로
+   * 중복 표시하지 않습니다.
    *
-   * confirmed 예약 1건 때문에
-   * 슬롯 remaining은 0이 되고,
-   * 공개 캘린더에서는 마감 상태로 유지됩니다.
+   * pending / rejected만 제안 카드로 표시합니다.
    */
-
-  revalidatePath(
-    "/admin"
-  );
-
-  revalidatePath(
-    "/book"
-  );
-
-  return {
-    success: true,
-
-    data: {
-      proposal:
-        acceptedProposal as DateProposal,
-
-      booking,
-    },
-  };
-}
-
-// ============================================================
-// 관리자가 날짜 제안 거절
-// ============================================================
-
-export async function rejectProposal(
-  proposalId: string
-): Promise<
-  ActionResult<{
-    proposal: DateProposal;
-  }>
-> {
-  const supabase =
-    await createClient();
-
-  const {
-    data: { user },
-    error: authError,
-  } =
-    await supabase.auth.getUser();
-
-  if (
-    authError ||
-    !user
-  ) {
-    return {
-      success: false,
-      error:
-        "로그인이 필요해요.",
-    };
-  }
-
-  if (!proposalId) {
-    return {
-      success: false,
-      error:
-        "날짜 제안 정보가 올바르지 않아요.",
-    };
-  }
-
-  const {
-    data,
-    error,
-  } = await supabase
-    .from(
-      "date_proposals"
-    )
-    .update({
-      status:
-        "rejected",
-    })
-    .eq(
-      "id",
-      proposalId
-    )
-    .eq(
-      "status",
-      "pending"
-    )
-    .select("*")
-    .single();
-
-  if (
-    error ||
-    !data
-  ) {
-    console.error(
-      "rejectProposal error:",
-      error
+  const visibleProposals =
+    proposals.filter(
+      (proposal) =>
+        proposal.status !==
+        "accepted"
     );
 
-    return {
-      success: false,
-      error:
-        error?.message ??
-        "날짜 제안 거절 중 오류가 발생했어요.",
-    };
-  }
+  const hasResults =
+    bookings.length > 0 ||
+    visibleProposals.length > 0;
 
-  revalidatePath(
-    "/admin"
+  return (
+    <div className="min-h-screen pb-20">
+      <header className="px-5 pt-8 pb-5">
+        <Link
+          href="/book/find"
+          className="inline-flex items-center gap-2 text-sm text-warm-gray-500"
+        >
+          <span>←</span>
+
+          <span>
+            다시 검색하기
+          </span>
+        </Link>
+      </header>
+
+      <main className="px-5">
+        <div className="mb-6">
+          <div className="text-4xl mb-4">
+            🗓️
+          </div>
+
+          <h1 className="text-2xl font-bold text-warm-gray-800">
+            내 약속
+          </h1>
+
+          <p className="text-sm text-warm-gray-500 mt-2">
+            {name}님이 신청하거나
+            제안한 약속이에요.
+          </p>
+        </div>
+
+        {!hasResults ? (
+          <div className="card p-7 text-center">
+            <p className="text-4xl mb-4">
+              🤔
+            </p>
+
+            <p className="font-semibold text-warm-gray-700">
+              일치하는 약속이 없어요
+            </p>
+
+            <p className="text-sm text-warm-gray-400 mt-2 leading-relaxed">
+              신청할 때 입력한 이름과
+              연락처가 맞는지
+              확인해주세요.
+            </p>
+
+            <Link
+              href="/book/find"
+              className="btn-secondary w-full text-center mt-6"
+            >
+              다시 입력하기
+            </Link>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-6">
+
+            {/* ================================================ */}
+            {/* 날짜 제안 */}
+            {/* ================================================ */}
+
+            {visibleProposals.length >
+              0 && (
+              <section>
+                <div className="flex items-center gap-2 mb-3">
+                  <span>
+                    💌
+                  </span>
+
+                  <h2 className="font-semibold text-warm-gray-700">
+                    날짜 제안
+                  </h2>
+                </div>
+
+                <div className="flex flex-col gap-3">
+                  {visibleProposals.map(
+                    (proposal) => {
+                      const status =
+                        getProposalStatusInfo(
+                          proposal.status
+                        );
+
+                      return (
+                        <div
+                          key={
+                            proposal.id
+                          }
+                          className="card p-5"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="text-xs text-warm-gray-400 mb-1">
+                                약속 이름
+                              </p>
+
+                              <h3 className="font-bold text-warm-gray-800">
+                                {
+                                  proposal.booking_title
+                                }
+                              </h3>
+                            </div>
+
+                            <span
+                              className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${status.className}`}
+                            >
+                              {
+                                status.label
+                              }
+                            </span>
+                          </div>
+
+                          <div className="mt-4 pt-4 border-t border-cream-200 flex flex-col gap-2">
+                            <p className="text-sm text-warm-gray-600">
+                              📅{" "}
+                              {formatDateRange(
+                                proposal.proposed_date,
+                                proposal.proposed_end_date
+                              )}
+                            </p>
+
+                            <p className="text-sm text-warm-gray-500">
+                              💬{" "}
+                              {getMeetingTypeLabel(
+                                proposal.meeting_type
+                              )}
+                            </p>
+
+                            <p className="text-sm text-warm-gray-500">
+                              👥{" "}
+                              {
+                                proposal.guest_count
+                              }
+                              명
+                            </p>
+                          </div>
+
+                          {proposal.status ===
+                            "pending" && (
+                            <div className="mt-4 rounded-xl bg-amber-50 px-3 py-3">
+                              <p className="text-xs text-amber-600 leading-relaxed">
+                                아직 관리자가
+                                확인하기 전이에요.
+                                수락되면 실제
+                                예약으로 전환돼요.
+                              </p>
+                            </div>
+                          )}
+
+                          {proposal.status ===
+                            "rejected" && (
+                            <div className="mt-4 rounded-xl bg-red-50 px-3 py-3">
+                              <p className="text-xs text-red-500 leading-relaxed">
+                                아쉽지만 이 날짜는
+                                만나기 어려워요.
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }
+                  )}
+                </div>
+              </section>
+            )}
+
+            {/* ================================================ */}
+            {/* 실제 예약 */}
+            {/* ================================================ */}
+
+            {bookings.length >
+              0 && (
+              <section>
+                <div className="flex items-center gap-2 mb-3">
+                  <span>
+                    🎯
+                  </span>
+
+                  <h2 className="font-semibold text-warm-gray-700">
+                    예약
+                  </h2>
+                </div>
+
+                <div className="flex flex-col gap-3">
+                  {bookings.map(
+                    (booking) => {
+                      const rawSlot =
+                        booking.available_slots;
+
+                      const slot =
+                        Array.isArray(
+                          rawSlot
+                        )
+                          ? rawSlot[0]
+                          : rawSlot;
+
+                      const status =
+                        getBookingStatusInfo(
+                          booking.status
+                        );
+
+                      return (
+                        <div
+                          key={
+                            booking.id
+                          }
+                          className="card p-5"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="text-xs text-warm-gray-400 mb-1">
+                                약속 이름
+                              </p>
+
+                              <h3 className="font-bold text-warm-gray-800">
+                                {
+                                  booking.booking_title
+                                }
+                              </h3>
+                            </div>
+
+                            <span
+                              className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${status.className}`}
+                            >
+                              {
+                                status.label
+                              }
+                            </span>
+                          </div>
+
+                          {slot && (
+                            <div className="mt-4 pt-4 border-t border-cream-200 flex flex-col gap-2">
+                              <p className="text-sm text-warm-gray-600">
+                                📅{" "}
+                                {formatDateRange(
+                                  slot.date,
+                                  slot.end_date
+                                )}
+                              </p>
+
+                              <p className="text-sm text-warm-gray-500">
+                                📍{" "}
+                                {getLocationLabel(
+                                  slot.location_text
+                                )}
+                              </p>
+
+                              <p className="text-sm text-warm-gray-500">
+                                💬{" "}
+                                {getMeetingTypeLabel(
+                                  booking.meeting_type
+                                )}
+                              </p>
+
+                              <p className="text-sm text-warm-gray-500">
+                                👥{" "}
+                                {
+                                  booking.guest_count
+                                }
+                                명
+                              </p>
+                            </div>
+                          )}
+
+                          {booking.manage_token &&
+                            booking.status !==
+                              "canceled" && (
+                              <Link
+                                href={`/book/manage/${booking.manage_token}`}
+                                className="btn-primary w-full text-center mt-5"
+                              >
+                                확인 / 변경하기
+                              </Link>
+                            )}
+                        </div>
+                      );
+                    }
+                  )}
+                </div>
+              </section>
+            )}
+          </div>
+        )}
+
+        <Link
+          href="/book"
+          className="btn-ghost w-full text-center mt-6"
+        >
+          예약 페이지로 돌아가기
+        </Link>
+      </main>
+    </div>
   );
-
-  return {
-    success: true,
-
-    data: {
-      proposal:
-        data as DateProposal,
-    },
-  };
 }
