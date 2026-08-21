@@ -46,6 +46,9 @@ export interface Booking {
   id: string;
   slot_id: string;
 
+  // 예약 관리용 비밀 토큰
+  manage_token: string;
+
   guest_name: string;
   guest_contact: string | null;
 
