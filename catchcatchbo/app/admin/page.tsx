@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import AdminSlotCard from "@/components/admin/AdminSlotCard";
 import BookingList from "@/components/admin/BookingList";
 import ProposalList from "@/components/admin/ProposalList";
+import ProposalChangeRequestList from "@/components/admin/ProposalChangeRequestList";
 import ShareSection from "@/components/admin/ShareSection";
 import { signOut } from "@/lib/actions/auth";
 import { APP_NAME } from "@/lib/constants";
@@ -47,6 +48,87 @@ type RawAdminSlot = {
 
   bookings:
     | {
+        status: string;
+      }[]
+    | null;
+};
+
+// ============================================================
+// 날짜 제안 변경 요청 타입
+// ============================================================
+
+type ProposalChangeRequest = {
+  id: string;
+
+  proposal_id: string;
+
+  booking_title: string;
+
+  proposed_date: string;
+
+  proposed_end_date:
+    | string
+    | null;
+
+  guest_count: number;
+
+  meeting_type: string;
+
+  note: string | null;
+
+  status: string;
+
+  created_at: string;
+
+  date_proposals:
+    | {
+        id: string;
+
+        guest_name: string;
+
+        guest_contact:
+          | string
+          | null;
+
+        booking_title: string;
+
+        proposed_date: string;
+
+        proposed_end_date:
+          | string
+          | null;
+
+        guest_count: number;
+
+        meeting_type: string;
+
+        note: string | null;
+
+        status: string;
+      }
+    | {
+        id: string;
+
+        guest_name: string;
+
+        guest_contact:
+          | string
+          | null;
+
+        booking_title: string;
+
+        proposed_date: string;
+
+        proposed_end_date:
+          | string
+          | null;
+
+        guest_count: number;
+
+        meeting_type: string;
+
+        note: string | null;
+
         status: string;
       }[]
     | null;
@@ -112,7 +194,8 @@ export default async function AdminPage() {
       slot.bookings ?? []
     ).filter(
       (booking) =>
-        booking.status === "confirmed"
+        booking.status ===
+        "confirmed"
     ).length;
 
     return {
@@ -122,8 +205,6 @@ export default async function AdminPage() {
 
       date: slot.date,
 
-      // 여러 날짜 일정
-      // end_date가 없으면 시작 날짜와 동일하게 처리
       end_date:
         slot.end_date ??
         slot.date,
@@ -146,7 +227,6 @@ export default async function AdminPage() {
       location_text:
         slot.location_text,
 
-      // 이미지
       image_url:
         slot.image_url ?? null,
 
@@ -158,7 +238,6 @@ export default async function AdminPage() {
         slot.image_text_color ??
         "dark",
 
-      // 기존 내부 예약 인원 로직
       max_guests:
         slot.max_guests,
 
@@ -267,6 +346,65 @@ export default async function AdminPage() {
     [];
 
   // ============================================================
+  // 날짜 제안 변경 요청
+  // ============================================================
+
+  const {
+    data: proposalChangeRows,
+    error: proposalChangesError,
+  } = await supabase
+    .from(
+      "proposal_change_requests"
+    )
+    .select(`
+      id,
+      proposal_id,
+      booking_title,
+      proposed_date,
+      proposed_end_date,
+      guest_count,
+      meeting_type,
+      note,
+      status,
+      created_at,
+      date_proposals (
+        id,
+        guest_name,
+        guest_contact,
+        booking_title,
+        proposed_date,
+        proposed_end_date,
+        guest_count,
+        meeting_type,
+        note,
+        status
+      )
+    `)
+    .eq(
+      "status",
+      "pending"
+    )
+    .order(
+      "created_at",
+      {
+        ascending: false,
+      }
+    );
+
+  if (proposalChangesError) {
+    console.error(
+      "AdminPage proposal changes error:",
+      proposalChangesError
+    );
+  }
+
+  const proposalChangeRequests =
+    (
+      proposalChangeRows ??
+      []
+    ) as ProposalChangeRequest[];
+
+  // ============================================================
   // 화면용 데이터
   // ============================================================
 
@@ -303,6 +441,9 @@ export default async function AdminPage() {
         proposal.status ===
         "pending"
     );
+
+  const pendingChangeCount =
+    proposalChangeRequests.length;
 
   // ============================================================
   // 화면
@@ -408,6 +549,34 @@ export default async function AdminPage() {
         </section>
 
         {/* ================================================== */}
+        {/* 변경 요청 */}
+        {/* ================================================== */}
+
+        {pendingChangeCount >
+          0 && (
+          <section>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-semibold text-warm-gray-700">
+                🔄 변경 요청
+              </h2>
+
+              <span className="text-xs font-medium bg-amber-50 text-amber-600 rounded-full px-2.5 py-1">
+                {
+                  pendingChangeCount
+                }
+                건
+              </span>
+            </div>
+
+            <ProposalChangeRequestList
+              requests={
+                proposalChangeRequests
+              }
+            />
+          </section>
+        )}
+
+        {/* ================================================== */}
         {/* 날짜 제안 */}
         {/* ================================================== */}
 
@@ -478,7 +647,6 @@ export default async function AdminPage() {
             </div>
           ) : (
             <div className="flex flex-col gap-3">
-              {/* 활성 일정 */}
               {activeSlots.map(
                 (slot) => (
                   <AdminSlotCard
@@ -492,7 +660,6 @@ export default async function AdminPage() {
                 )
               )}
 
-              {/* 비활성 일정 */}
               {inactiveSlots.length >
                 0 && (
                 <>
