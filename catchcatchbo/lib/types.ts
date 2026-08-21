@@ -5,9 +5,15 @@
 export interface AvailableSlot {
   id: string;
   owner_id: string;
+
+  // 일정 시작일 / 종료일
   date: string;
+  end_date: string;
+
+  // 기존 호환용 시간값
   start_time: string;
   end_time: string;
+
   title: string | null;
   meeting_type: string;
   description: string | null;
@@ -15,15 +21,21 @@ export interface AvailableSlot {
 
   // 대표 이미지
   image_url: string | null;
-  image_position: string;
+  image_position: string | null;
   image_text_color: "dark" | "light";
 
   max_guests: number;
   is_active: boolean;
+
   created_at: string;
   updated_at: string;
+
   booking_count?: number;
 }
+
+// ============================================================
+// 예약
+// ============================================================
 
 export type BookingStatus =
   | "pending"
@@ -48,13 +60,10 @@ export interface Booking {
   created_at: string;
   canceled_at: string | null;
 
-  /*
-   * 예약/캘린더 로직에서 필요한 일정 정보만 사용.
-   * 이미지 정보는 Booking에 강제로 요구하지 않음.
-   */
   available_slots?: Pick<
     AvailableSlot,
     | "date"
+    | "end_date"
     | "start_time"
     | "end_time"
     | "title"
@@ -78,7 +87,11 @@ export interface DateProposal {
   guest_name: string;
   guest_contact: string | null;
 
+  // 제안 시작일 / 종료일
   proposed_date: string;
+  proposed_end_date: string;
+
+  // 기존 호환용 시간값
   proposed_time: string | null;
   proposed_end_time: string | null;
 
@@ -94,7 +107,7 @@ export interface DateProposal {
 }
 
 // ============================================================
-// 공개 / 관리자 일정
+// 슬롯 + 예약 현황
 // ============================================================
 
 export interface SlotWithCount
@@ -105,11 +118,15 @@ export interface SlotWithCount
 }
 
 // ============================================================
-// 일정 폼
+// 관리자 일정 등록 폼
 // ============================================================
 
 export interface SlotFormData {
+  // 일정 시작일 / 종료일
   date: string;
+  end_date: string;
+
+  // 기존 서버/DB 호환용
   start_time: string;
   end_time: string;
 
@@ -122,13 +139,15 @@ export interface SlotFormData {
 
   image_url: string;
   image_position: string;
-  image_text_color: "dark" | "light";
+  image_text_color:
+    | "dark"
+    | "light";
 
   max_guests: number;
 }
 
 // ============================================================
-// 예약 폼
+// 예약 신청 폼
 // ============================================================
 
 export interface BookingFormData {
@@ -150,7 +169,11 @@ export interface DateProposalFormData {
   guest_name: string;
   guest_contact: string;
 
+  // 제안 시작일 / 종료일
   proposed_date: string;
+  proposed_end_date: string;
+
+  // 기존 호환용
   proposed_time: string;
   proposed_end_time: string;
 
@@ -165,7 +188,9 @@ export interface DateProposalFormData {
 // Server Action 공통 응답
 // ============================================================
 
-export interface ActionResult<T = void> {
+export interface ActionResult<
+  T = void
+> {
   success: boolean;
   data?: T;
   error?: string;
