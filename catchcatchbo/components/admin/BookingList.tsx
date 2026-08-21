@@ -8,7 +8,6 @@ import { useRouter } from "next/navigation";
 import { MeetingTypeBadge } from "@/components/ui/Badge";
 import {
   formatKoreanDate,
-  formatTimeRange,
   getMeetingTypeLabel,
   getLocationLabel,
 } from "@/lib/utils";
@@ -25,6 +24,36 @@ interface BookingListProps {
   bookings: Booking[];
 }
 
+// ============================================================
+// 날짜 범위 표시
+// ============================================================
+
+function formatDateRange(
+  startDate: string,
+  endDate?: string | null
+): string {
+  const finalEndDate =
+    endDate || startDate;
+
+  if (
+    startDate === finalEndDate
+  ) {
+    return formatKoreanDate(
+      startDate
+    );
+  }
+
+  return `${formatKoreanDate(
+    startDate
+  )} ~ ${formatKoreanDate(
+    finalEndDate
+  )}`;
+}
+
+// ============================================================
+// 예약 상태 배지
+// ============================================================
+
 function BookingStatusBadge({
   status,
 }: {
@@ -36,8 +65,10 @@ function BookingStatusBadge({
   > = {
     pending:
       "bg-amber-50 text-amber-600",
+
     confirmed:
       "bg-green-50 text-green-600",
+
     canceled:
       "bg-warm-gray-100 text-warm-gray-400",
   };
@@ -46,9 +77,14 @@ function BookingStatusBadge({
     BookingStatus,
     string
   > = {
-    pending: "확정 대기",
-    confirmed: "예약 확정",
-    canceled: "취소됨",
+    pending:
+      "확정 대기",
+
+    confirmed:
+      "예약 확정",
+
+    canceled:
+      "취소됨",
   };
 
   return (
@@ -60,12 +96,17 @@ function BookingStatusBadge({
   );
 }
 
+// ============================================================
+// 예약 카드
+// ============================================================
+
 function BookingRow({
   booking,
 }: {
   booking: Booking;
 }) {
-  const router = useRouter();
+  const router =
+    useRouter();
 
   const [
     isPending,
@@ -78,7 +119,9 @@ function BookingRow({
   ] = useState(false);
 
   const [error, setError] =
-    useState<string | null>(null);
+    useState<string | null>(
+      null
+    );
 
   /*
    * 예약 확정 직후에는 새로고침하지 않고
@@ -117,8 +160,12 @@ function BookingRow({
       `${message}\n\n${shareUrl}`;
 
     /*
-     * navigator.share는 반드시 사용자가 직접 누른
-     * 클릭 이벤트에서 바로 실행하는 것이 가장 안정적입니다.
+     * 공유 버튼을 직접 눌렀을 때만
+     * navigator.share를 실행합니다.
+     *
+     * 서버 작업 이후 자동 실행하면
+     * 모바일 브라우저에서 공유창이
+     * 차단될 수 있습니다.
      */
     if (navigator.share) {
       try {
@@ -129,10 +176,11 @@ function BookingRow({
         });
 
         return;
-      } catch (shareError) {
+      } catch (
+        shareError
+      ) {
         /*
-         * 사용자가 공유창을 직접 닫은 경우에는
-         * 오류 안내를 띄우지 않습니다.
+         * 사용자가 공유창을 직접 닫은 경우
          */
         if (
           shareError instanceof
@@ -151,8 +199,8 @@ function BookingRow({
     }
 
     /*
-     * Web Share API가 없거나 실패한 경우
-     * 메시지를 클립보드에 복사합니다.
+     * Web Share API가 없거나 실패하면
+     * 클립보드 복사
      */
     try {
       await navigator.clipboard.writeText(
@@ -190,8 +238,15 @@ function BookingRow({
       setError(
         "공유할 일정 정보를 찾을 수 없어요."
       );
+
       return;
     }
+
+    const dateRange =
+      formatDateRange(
+        confirmedSlot.date,
+        confirmedSlot.end_date
+      );
 
     const message = `🎯 캐치캐치보
 
@@ -199,13 +254,7 @@ ${confirmedBooking.guest_name}아, 약속 확정됐어! 🎉
 
 💬 ${confirmedBooking.booking_title}
 👥 ${confirmedBooking.guest_count}명
-📅 ${formatKoreanDate(
-      confirmedSlot.date
-    )}
-🕐 ${formatTimeRange(
-      confirmedSlot.start_time,
-      confirmedSlot.end_time
-    )}
+📅 ${dateRange}
 📍 ${getLocationLabel(
       confirmedSlot.location_text
     )}
@@ -232,8 +281,15 @@ ${confirmedBooking.guest_name}아, 약속 확정됐어! 🎉
       setError(
         "공유할 일정 정보를 찾을 수 없어요."
       );
+
       return;
     }
+
+    const dateRange =
+      formatDateRange(
+        rejectedSlot.date,
+        rejectedSlot.end_date
+      );
 
     const message = `🎯 캐치캐치보
 
@@ -241,13 +297,7 @@ ${rejectedBooking.guest_name}아, 아쉽지만 이번 약속은 어려울 것 �
 
 💬 ${rejectedBooking.booking_title}
 👥 ${rejectedBooking.guest_count}명
-📅 ${formatKoreanDate(
-      rejectedSlot.date
-    )}
-🕐 ${formatTimeRange(
-      rejectedSlot.start_time,
-      rejectedSlot.end_time
-    )}
+📅 ${dateRange}
 📍 ${getLocationLabel(
       rejectedSlot.location_text
     )}
@@ -277,7 +327,8 @@ ${rejectedBooking.guest_name}아, 아쉽지만 이번 약속은 어려울 것 �
 
         if (
           !result.success ||
-          !result.data?.booking
+          !result.data
+            ?.booking
         ) {
           setError(
             result.error ??
@@ -288,11 +339,11 @@ ${rejectedBooking.guest_name}아, 아쉽지만 이번 약속은 어려울 것 �
         }
 
         /*
-         * 여기서 navigator.share를 자동 실행하지 않습니다.
+         * 확정 후 자동 공유 X
          *
-         * 서버 작업 이후 자동 실행하면
-         * Safari/Chrome에서 사용자 제스처로 인정되지 않아
-         * 공유창이 막힐 수 있습니다.
+         * 사용자가 직접
+         * '확정 메시지 보내기'를 눌러야
+         * 공유창이 안정적으로 열립니다.
          */
         setJustConfirmedBooking(
           result.data.booking
@@ -308,10 +359,6 @@ ${rejectedBooking.guest_name}아, 아쉽지만 이번 약속은 어려울 것 �
   function handleCancel() {
     setError(null);
 
-    const wasPending =
-      currentStatus ===
-      "pending";
-
     startTransition(
       async () => {
         const result =
@@ -319,7 +366,9 @@ ${rejectedBooking.guest_name}아, 아쉽지만 이번 약속은 어려울 것 �
             booking.id
           );
 
-        if (!result.success) {
+        if (
+          !result.success
+        ) {
           setError(
             result.error ??
               "예약 처리 중 오류가 발생했어요."
@@ -331,18 +380,6 @@ ${rejectedBooking.guest_name}아, 아쉽지만 이번 약속은 어려울 것 �
         setShowCancelConfirm(
           false
         );
-
-        /*
-         * 거절 역시 서버 처리 후 자동 공유하지 않습니다.
-         *
-         * 화면을 갱신한 뒤 취소된 카드의
-         * '거절 메시지 다시 보내기' 버튼을 통해
-         * 사용자가 직접 공유할 수 있습니다.
-         */
-        if (wasPending) {
-          router.refresh();
-          return;
-        }
 
         router.refresh();
       }
@@ -418,21 +455,15 @@ ${rejectedBooking.guest_name}아, 아쉽지만 이번 약속은 어려울 것 �
       {/* 일정 정보 */}
 
       {slot && (
-        <div className="bg-cream-100 rounded-xl px-3 py-2 text-sm text-warm-gray-600">
-          <p className="font-medium">
-            {formatKoreanDate(
-              slot.date
+        <div className="bg-cream-100 rounded-xl px-3 py-3 text-sm text-warm-gray-600">
+          <p className="font-medium leading-snug">
+            {formatDateRange(
+              slot.date,
+              slot.end_date
             )}
           </p>
 
-          <p className="text-warm-gray-400 text-xs mt-0.5">
-            {formatTimeRange(
-              slot.start_time,
-              slot.end_time
-            )}
-          </p>
-
-          <p className="text-warm-gray-400 text-xs mt-1">
+          <p className="text-warm-gray-400 text-xs mt-1.5">
             📍{" "}
             {getLocationLabel(
               slot.location_text
@@ -459,9 +490,9 @@ ${rejectedBooking.guest_name}아, 아쉽지만 이번 약속은 어려울 것 �
         </p>
       )}
 
-      {/* ================================================ */}
+      {/* ====================================================== */}
       {/* 확정 직후 */}
-      {/* ================================================ */}
+      {/* ====================================================== */}
 
       {justConfirmedBooking && (
         <div className="flex flex-col gap-3 rounded-xl bg-green-50 p-3">
@@ -471,9 +502,8 @@ ${rejectedBooking.guest_name}아, 아쉽지만 이번 약속은 어려울 것 �
             </p>
 
             <p className="mt-1 text-xs text-green-600">
-              이제 친구에게
-              확정 메시지를
-              보내주세요.
+              이제 친구에게 확정
+              메시지를 보내주세요.
             </p>
           </div>
 
@@ -505,9 +535,9 @@ ${rejectedBooking.guest_name}아, 아쉽지만 이번 약속은 어려울 것 �
         </div>
       )}
 
-      {/* ================================================ */}
+      {/* ====================================================== */}
       {/* 거절 / 취소 확인 */}
-      {/* ================================================ */}
+      {/* ====================================================== */}
 
       {!justConfirmedBooking &&
         showCancelConfirm && (
@@ -566,9 +596,9 @@ ${rejectedBooking.guest_name}아, 아쉽지만 이번 약속은 어려울 것 �
           </div>
         )}
 
-      {/* ================================================ */}
+      {/* ====================================================== */}
       {/* 확정 대기 */}
-      {/* ================================================ */}
+      {/* ====================================================== */}
 
       {currentStatus ===
         "pending" &&
@@ -607,17 +637,15 @@ ${rejectedBooking.guest_name}아, 아쉽지만 이번 약속은 어려울 것 �
           </div>
         )}
 
-      {/* ================================================ */}
+      {/* ====================================================== */}
       {/* 기존 확정 예약 */}
-      {/* ================================================ */}
+      {/* ====================================================== */}
 
       {currentStatus ===
         "confirmed" &&
         !showCancelConfirm &&
         !justConfirmedBooking && (
           <div className="flex flex-col gap-2">
-            {/* 언제든 확정 메시지를 다시 보낼 수 있음 */}
-
             {slot && (
               <button
                 type="button"
@@ -649,9 +677,9 @@ ${rejectedBooking.guest_name}아, 아쉽지만 이번 약속은 어려울 것 �
           </div>
         )}
 
-      {/* ================================================ */}
+      {/* ====================================================== */}
       {/* 취소 / 거절 */}
-      {/* ================================================ */}
+      {/* ====================================================== */}
 
       {currentStatus ===
         "canceled" && (
@@ -697,7 +725,8 @@ export default function BookingList({
   bookings,
 }: BookingListProps) {
   if (
-    bookings.length === 0
+    bookings.length ===
+    0
   ) {
     return (
       <div className="text-center py-12 text-warm-gray-400">
@@ -737,11 +766,15 @@ export default function BookingList({
     <div className="flex flex-col gap-6">
       {/* 확정 대기 */}
 
-      {pending.length > 0 && (
+      {pending.length >
+        0 && (
         <section>
           <h3 className="text-sm font-semibold text-amber-600 mb-3">
             확정 대기 ·{" "}
-            {pending.length}건
+            {
+              pending.length
+            }
+            건
           </h3>
 
           <div className="flex flex-col gap-3">
