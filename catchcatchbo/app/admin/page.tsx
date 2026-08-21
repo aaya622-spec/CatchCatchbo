@@ -8,6 +8,7 @@ import AdminSlotCard from "@/components/admin/AdminSlotCard";
 import BookingList from "@/components/admin/BookingList";
 import ProposalList from "@/components/admin/ProposalList";
 import ProposalChangeRequestList from "./ProposalChangeRequestList";
+import HistoryManager from "./HistoryManager";
 import ShareSection from "@/components/admin/ShareSection";
 
 import { signOut } from "@/lib/actions/auth";
@@ -45,7 +46,7 @@ interface AdminPageProps {
 }
 
 // ============================================================
-// 일정 타입
+// 관리자 일정 타입
 // ============================================================
 
 type RawAdminSlot = {
@@ -84,7 +85,7 @@ type RawAdminSlot = {
 };
 
 // ============================================================
-// 변경 요청 타입
+// 날짜 제안 변경 요청 타입
 // ============================================================
 
 type ProposalChangeRequest = {
@@ -113,52 +114,34 @@ type ProposalChangeRequest = {
   date_proposals:
     | {
         id: string;
-
         guest_name: string;
-
         guest_contact:
           | string
           | null;
-
         booking_title: string;
-
         proposed_date: string;
-
         proposed_end_date:
           | string
           | null;
-
         guest_count: number;
-
         meeting_type: string;
-
         note: string | null;
-
         status: string;
       }
     | {
         id: string;
-
         guest_name: string;
-
         guest_contact:
           | string
           | null;
-
         booking_title: string;
-
         proposed_date: string;
-
         proposed_end_date:
           | string
           | null;
-
         guest_count: number;
-
         meeting_type: string;
-
         note: string | null;
-
         status: string;
       }[]
     | null;
@@ -217,9 +200,7 @@ function AdminTabLink({
           : "text-warm-gray-400"
       }`}
     >
-      <span>
-        {label}
-      </span>
+      {label}
 
       {!!count && (
         <span
@@ -603,13 +584,11 @@ export default async function AdminPage({
         "pending"
     );
 
-  const processedProposals =
+  const rejectedProposals =
     proposals.filter(
       (proposal) =>
         proposal.status ===
-          "accepted" ||
-        proposal.status ===
-          "rejected"
+        "rejected"
     );
 
   const totalPending =
@@ -617,33 +596,40 @@ export default async function AdminPage({
     pendingProposals.length +
     proposalChangeRequests.length;
 
-  // 홈에서는 너무 길어지지 않게
-  // 가까운 약속 / 열린 일정만 일부 노출
+  // ============================================================
+  // 홈 미리보기
+  // ============================================================
+
   const upcomingBookings =
     confirmedBookings
       .filter(
         (booking) =>
           booking.available_slots
       )
-      .sort((a, b) => {
-        const aDate =
-          a.available_slots?.date ??
-          "";
+      .sort(
+        (a, b) => {
+          const aDate =
+            a.available_slots?.date ??
+            "";
 
-        const bDate =
-          b.available_slots?.date ??
-          "";
+          const bDate =
+            b.available_slots?.date ??
+            "";
 
-        return aDate.localeCompare(
-          bDate
-        );
-      })
-      .slice(0, 4);
+          return aDate.localeCompare(
+            bDate
+          );
+        }
+      )
+      .slice(
+        0,
+        4
+      );
 
   const previewSlots =
     activeSlots.slice(
       0,
-      4
+      3
     );
 
   // ============================================================
@@ -689,7 +675,6 @@ export default async function AdminPage({
             </form>
           </div>
 
-          {/* 탭 */}
           <div className="mt-4 flex gap-1 rounded-2xl bg-cream-200/70 p-1">
             <AdminTabLink
               tab="home"
@@ -738,88 +723,78 @@ export default async function AdminPage({
           "home" && (
           <div className="flex flex-col gap-8">
             {/* 요약 */}
-            <section>
-              <div className="grid grid-cols-3 gap-3">
-                <Link
-                  href="/admin?tab=requests"
-                  className="card p-4 text-center"
-                >
-                  <p className="text-2xl font-bold text-peach-400">
-                    {
-                      totalPending
-                    }
-                  </p>
 
-                  <p className="text-xs text-warm-gray-400 mt-1">
-                    처리 대기
-                  </p>
-                </Link>
+            <section className="grid grid-cols-3 gap-3">
+              <Link
+                href="/admin?tab=requests"
+                className="card p-4 text-center"
+              >
+                <p className="text-2xl font-bold text-peach-400">
+                  {
+                    totalPending
+                  }
+                </p>
 
-                <div className="card p-4 text-center">
-                  <p className="text-2xl font-bold text-sage-400">
-                    {
-                      confirmedBookings.length
-                    }
-                  </p>
+                <p className="text-xs text-warm-gray-400 mt-1">
+                  처리 대기
+                </p>
+              </Link>
 
-                  <p className="text-xs text-warm-gray-400 mt-1">
-                    확정 약속
-                  </p>
-                </div>
+              <Link
+                href="/admin?tab=schedule"
+                className="card p-4 text-center"
+              >
+                <p className="text-2xl font-bold text-sage-400">
+                  {
+                    confirmedBookings.length
+                  }
+                </p>
 
-                <Link
-                  href="/admin?tab=schedule"
-                  className="card p-4 text-center"
-                >
-                  <p className="text-2xl font-bold text-warm-gray-600">
-                    {
-                      activeSlots.length
-                    }
-                  </p>
+                <p className="text-xs text-warm-gray-400 mt-1">
+                  예정 약속
+                </p>
+              </Link>
 
-                  <p className="text-xs text-warm-gray-400 mt-1">
-                    열린 일정
-                  </p>
-                </Link>
-              </div>
+              <Link
+                href="/admin?tab=schedule"
+                className="card p-4 text-center"
+              >
+                <p className="text-2xl font-bold text-warm-gray-600">
+                  {
+                    activeSlots.length
+                  }
+                </p>
+
+                <p className="text-xs text-warm-gray-400 mt-1">
+                  열린 일정
+                </p>
+              </Link>
             </section>
 
-            {/* 처리 대기 */}
-            <section>
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h2 className="font-semibold text-warm-gray-700">
-                    🚨 지금 확인해주세요
-                  </h2>
+            {/* 처리할 요청이 있을 때만 표시 */}
 
-                  <p className="text-xs text-warm-gray-400 mt-1">
-                    아직 처리하지 않은 요청만 보여요.
-                  </p>
-                </div>
+            {totalPending >
+              0 && (
+              <section>
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h2 className="font-semibold text-warm-gray-700">
+                      🚨 지금 확인해주세요
+                    </h2>
 
-                {totalPending >
-                  0 && (
+                    <p className="text-xs text-warm-gray-400 mt-1">
+                      아직 처리하지 않은 요청이에요.
+                    </p>
+                  </div>
+
                   <Link
                     href="/admin?tab=requests"
                     className="text-sm text-peach-500"
                   >
                     전체 보기
                   </Link>
-                )}
-              </div>
-
-              {totalPending ===
-              0 ? (
-                <div className="card p-6 text-center">
-                  <p className="text-2xl">
-                    ✨
-                  </p>
-
-                  <p className="text-sm font-medium text-warm-gray-600 mt-2">
-                    처리할 요청이 없어요
-                  </p>
                 </div>
-              ) : (
+
                 <div className="card p-5">
                   <div className="flex flex-col gap-4">
                     {proposalChangeRequests.length >
@@ -828,15 +803,9 @@ export default async function AdminPage({
                         href="/admin?tab=requests"
                         className="flex items-center justify-between"
                       >
-                        <div>
-                          <p className="text-sm font-medium text-warm-gray-700">
-                            🔄 변경 요청
-                          </p>
-
-                          <p className="text-xs text-warm-gray-400 mt-1">
-                            약속 내용을 바꾸고 싶다는 요청
-                          </p>
-                        </div>
+                        <span className="text-sm font-medium text-warm-gray-700">
+                          🔄 변경 요청
+                        </span>
 
                         <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-600">
                           {
@@ -853,15 +822,9 @@ export default async function AdminPage({
                         href="/admin?tab=requests"
                         className="flex items-center justify-between"
                       >
-                        <div>
-                          <p className="text-sm font-medium text-warm-gray-700">
-                            🎯 예약 신청
-                          </p>
-
-                          <p className="text-xs text-warm-gray-400 mt-1">
-                            열어둔 일정에 들어온 신청
-                          </p>
-                        </div>
+                        <span className="text-sm font-medium text-warm-gray-700">
+                          🎯 예약 신청
+                        </span>
 
                         <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-600">
                           {
@@ -878,15 +841,9 @@ export default async function AdminPage({
                         href="/admin?tab=requests"
                         className="flex items-center justify-between"
                       >
-                        <div>
-                          <p className="text-sm font-medium text-warm-gray-700">
-                            💌 날짜 제안
-                          </p>
-
-                          <p className="text-xs text-warm-gray-400 mt-1">
-                            친구가 직접 제안한 날짜
-                          </p>
-                        </div>
+                        <span className="text-sm font-medium text-warm-gray-700">
+                          💌 날짜 제안
+                        </span>
 
                         <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-600">
                           {
@@ -898,10 +855,11 @@ export default async function AdminPage({
                     )}
                   </div>
                 </div>
-              )}
-            </section>
+              </section>
+            )}
 
             {/* 다가오는 약속 */}
+
             <section>
               <div className="flex items-center justify-between mb-4">
                 <h2 className="font-semibold text-warm-gray-700">
@@ -912,7 +870,7 @@ export default async function AdminPage({
                   href="/admin?tab=schedule"
                   className="text-sm text-warm-gray-400"
                 >
-                  일정 보기
+                  전체 보기
                 </Link>
               </div>
 
@@ -920,7 +878,7 @@ export default async function AdminPage({
               0 ? (
                 <div className="card p-6 text-center">
                   <p className="text-sm text-warm-gray-400">
-                    아직 확정된 약속이 없어요.
+                    아직 예정된 약속이 없어요.
                   </p>
                 </div>
               ) : (
@@ -977,7 +935,8 @@ export default async function AdminPage({
               )}
             </section>
 
-            {/* 열린 일정 */}
+            {/* 가능한 날 */}
+
             <section>
               <div className="flex items-center justify-between mb-4">
                 <h2 className="font-semibold text-warm-gray-700">
@@ -998,13 +957,6 @@ export default async function AdminPage({
                   <p className="text-sm text-warm-gray-400">
                     현재 열려있는 일정이 없어요.
                   </p>
-
-                  <Link
-                    href="/admin/slots/new"
-                    className="btn-primary inline-flex mt-4 text-sm"
-                  >
-                    + 가능한 날 열기
-                  </Link>
                 </div>
               ) : (
                 <div className="card divide-y divide-cream-200">
@@ -1052,38 +1004,57 @@ export default async function AdminPage({
               )}
             </section>
 
-            {/* 빠른 설정 */}
+            {/* 관리 */}
+
             <section>
               <h2 className="font-semibold text-warm-gray-700 mb-4">
-                ⚙️ 빠른 설정
+                ⚙️ 관리
               </h2>
 
-              <div className="flex flex-col gap-3">
-                <ShareSection
-                  bookUrl={
-                    bookUrl
-                  }
-                />
-
-                <div className="card p-4">
-                  <div className="flex items-center justify-between gap-4">
+              <div className="card overflow-hidden divide-y divide-cream-200">
+                <details>
+                  <summary className="list-none cursor-pointer p-4 flex items-center justify-between">
                     <div>
                       <p className="font-medium text-warm-gray-700">
-                        Google Calendar
+                        🔗 예약 링크 공유
                       </p>
 
                       <p className="text-xs text-warm-gray-400 mt-1">
-                        확정 약속을 자동 등록해요.
+                        친구에게 보낼 예약 링크
                       </p>
                     </div>
 
-                    <a
-                      href="/api/auth/google"
-                      className="btn-secondary text-sm shrink-0"
-                    >
-                      연결
-                    </a>
+                    <span className="text-warm-gray-300">
+                      ›
+                    </span>
+                  </summary>
+
+                  <div className="px-4 pb-4">
+                    <ShareSection
+                      bookUrl={
+                        bookUrl
+                      }
+                    />
                   </div>
+                </details>
+
+                <div className="p-4 flex items-center justify-between gap-4">
+                  <div>
+                    <p className="font-medium text-warm-gray-700">
+                      📅 Google Calendar
+                    </p>
+
+                    <p className="text-xs text-warm-gray-400 mt-1">
+                      확정 약속을 자동 등록해요.
+                    </p>
+                  </div>
+
+                  <a
+                    href="/api/auth/google"
+                    className="btn-secondary text-sm shrink-0"
+                  >
+                    연결
+                  </a>
                 </div>
               </div>
             </section>
@@ -1103,11 +1074,10 @@ export default async function AdminPage({
               </h2>
 
               <p className="text-sm text-warm-gray-400 mt-1">
-                지금 확인하고 처리해야 하는 것만 모았어요.
+                지금 처리해야 하는 요청만 모았어요.
               </p>
             </div>
 
-            {/* 변경 요청 */}
             <section>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-semibold text-warm-gray-700">
@@ -1139,7 +1109,6 @@ export default async function AdminPage({
               )}
             </section>
 
-            {/* 예약 신청 */}
             <section>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-semibold text-warm-gray-700">
@@ -1164,7 +1133,6 @@ export default async function AdminPage({
               />
             </section>
 
-            {/* 날짜 제안 */}
             <section>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-semibold text-warm-gray-700">
@@ -1205,7 +1173,7 @@ export default async function AdminPage({
                 </h2>
 
                 <p className="text-sm text-warm-gray-400 mt-1">
-                  확정 약속과 열어둔 날짜를 관리해요.
+                  예정된 약속과 열어둔 날짜를 관리해요.
                 </p>
               </div>
 
@@ -1217,7 +1185,6 @@ export default async function AdminPage({
               </Link>
             </div>
 
-            {/* 확정 약속 */}
             <section>
               <h3 className="font-semibold text-warm-gray-700 mb-4">
                 📅 예정된 약속
@@ -1230,7 +1197,6 @@ export default async function AdminPage({
               />
             </section>
 
-            {/* 열린 슬롯 */}
             <section>
               <h3 className="font-semibold text-warm-gray-700 mb-4">
                 🗓 가능한 날
@@ -1239,10 +1205,6 @@ export default async function AdminPage({
               {slots.length ===
               0 ? (
                 <div className="card p-8 text-center">
-                  <p className="text-3xl mb-3">
-                    📅
-                  </p>
-
                   <p className="text-sm text-warm-gray-400">
                     아직 열어둔 날이 없어요.
                   </p>
@@ -1302,35 +1264,18 @@ export default async function AdminPage({
               </h2>
 
               <p className="text-sm text-warm-gray-400 mt-1">
-                이미 처리된 요청을 다시 확인할 수 있어요.
+                필요 없는 테스트나 지난 기록을 정리할 수 있어요.
               </p>
             </div>
 
-            {/* 처리된 날짜 제안 */}
-            <section>
-              <h3 className="font-semibold text-warm-gray-700 mb-4">
-                💌 처리된 날짜 제안
-              </h3>
-
-              <ProposalList
-                proposals={
-                  processedProposals
-                }
-              />
-            </section>
-
-            {/* 취소된 예약 */}
-            <section>
-              <h3 className="font-semibold text-warm-gray-700 mb-4">
-                취소된 예약
-              </h3>
-
-              <BookingList
-                bookings={
-                  canceledBookings
-                }
-              />
-            </section>
+            <HistoryManager
+              rejectedProposals={
+                rejectedProposals
+              }
+              canceledBookings={
+                canceledBookings
+              }
+            />
           </div>
         )}
       </main>
