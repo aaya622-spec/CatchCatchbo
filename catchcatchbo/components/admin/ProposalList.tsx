@@ -11,7 +11,6 @@ import {
 } from "@/lib/actions/proposals";
 import {
   formatKoreanDate,
-  formatTimeRange,
   getMeetingTypeLabel,
 } from "@/lib/utils";
 import type {
@@ -34,6 +33,32 @@ type ProcessedState =
   | null;
 
 // ============================================================
+// 날짜 범위 표시
+// ============================================================
+
+function formatProposalDateRange(
+  startDate: string,
+  endDate?: string | null
+): string {
+  const finalEndDate =
+    endDate || startDate;
+
+  if (
+    startDate === finalEndDate
+  ) {
+    return formatKoreanDate(
+      startDate
+    );
+  }
+
+  return `${formatKoreanDate(
+    startDate
+  )} ~ ${formatKoreanDate(
+    finalEndDate
+  )}`;
+}
+
+// ============================================================
 // 개별 날짜 제안 카드
 // ============================================================
 
@@ -42,7 +67,8 @@ function ProposalCard({
 }: {
   proposal: DateProposal;
 }) {
-  const router = useRouter();
+  const router =
+    useRouter();
 
   const [
     isPending,
@@ -50,14 +76,17 @@ function ProposalCard({
   ] = useTransition();
 
   const [error, setError] =
-    useState<string | null>(null);
+    useState<string | null>(
+      null
+    );
 
   const [
     processed,
     setProcessed,
-  ] = useState<ProcessedState>(
-    null
-  );
+  ] =
+    useState<ProcessedState>(
+      null
+    );
 
   // ============================================================
   // 공유
@@ -74,8 +103,8 @@ function ProposalCard({
       `${message}\n\n${bookUrl}`;
 
     /*
-     * 반드시 실제 버튼 클릭 이벤트에서
-     * navigator.share를 바로 실행합니다.
+     * 실제 공유 버튼을 눌렀을 때
+     * navigator.share 실행
      */
     if (navigator.share) {
       try {
@@ -86,7 +115,9 @@ function ProposalCard({
         });
 
         return;
-      } catch (shareError) {
+      } catch (
+        shareError
+      ) {
         if (
           shareError instanceof
             DOMException &&
@@ -104,8 +135,8 @@ function ProposalCard({
     }
 
     /*
-     * 공유 API가 지원되지 않거나 실패하면
-     * 클립보드에 복사
+     * 공유 API가 없거나 실패하면
+     * 클립보드 복사
      */
     try {
       await navigator.clipboard.writeText(
@@ -136,19 +167,11 @@ function ProposalCard({
   async function shareAcceptedProposal(
     accepted: DateProposal
   ) {
-    const timeText =
-      accepted.proposed_time &&
-      accepted.proposed_end_time
-        ? formatTimeRange(
-            accepted.proposed_time,
-            accepted.proposed_end_time
-          )
-        : accepted.proposed_time
-          ? accepted.proposed_time.slice(
-              0,
-              5
-            )
-          : "시간은 같이 정해보자!";
+    const dateRange =
+      formatProposalDateRange(
+        accepted.proposed_date,
+        accepted.proposed_end_date
+      );
 
     const message = `🎯 캐치캐치보
 
@@ -156,10 +179,7 @@ ${accepted.guest_name}아, 제안한 날짜 좋아! 🙌
 
 💬 ${accepted.booking_title}
 👥 ${accepted.guest_count}명
-📅 ${formatKoreanDate(
-      accepted.proposed_date
-    )}
-🕐 ${timeText}
+📅 ${dateRange}
 
 이날 보자!`;
 
@@ -176,29 +196,18 @@ ${accepted.guest_name}아, 제안한 날짜 좋아! 🙌
   async function shareRejectedProposal(
     rejected: DateProposal
   ) {
-    const timeText =
-      rejected.proposed_time &&
-      rejected.proposed_end_time
-        ? formatTimeRange(
-            rejected.proposed_time,
-            rejected.proposed_end_time
-          )
-        : rejected.proposed_time
-          ? rejected.proposed_time.slice(
-              0,
-              5
-            )
-          : "시간 미정";
+    const dateRange =
+      formatProposalDateRange(
+        rejected.proposed_date,
+        rejected.proposed_end_date
+      );
 
     const message = `🎯 캐치캐치보
 
 ${rejected.guest_name}아, 제안해준 날짜는 아쉽게도 어려울 것 같아 🥲
 
 💬 ${rejected.booking_title}
-📅 ${formatKoreanDate(
-      rejected.proposed_date
-    )}
-🕐 ${timeText}
+📅 ${dateRange}
 
 다른 날짜로 다시 맞춰보자!`;
 
@@ -237,7 +246,7 @@ ${rejected.guest_name}아, 제안해준 날짜는 아쉽게도 어려울 것 같
         /*
          * 서버 처리 후 자동 공유하지 않음.
          * 완료 화면에서 사용자가 직접
-         * 공유 버튼을 누르게 합니다.
+         * 공유 버튼을 누름.
          */
         setProcessed({
           type: "accepted",
@@ -284,13 +293,21 @@ ${rejected.guest_name}아, 제안해준 날짜는 아쉽게도 어려울 것 같
   }
 
   // ============================================================
-  // 수락/거절 완료 화면
+  // 수락 / 거절 완료 화면
   // ============================================================
 
   if (processed) {
     const isAccepted =
       processed.type ===
       "accepted";
+
+    const processedDateRange =
+      formatProposalDateRange(
+        processed.proposal
+          .proposed_date,
+        processed.proposal
+          .proposed_end_date
+      );
 
     return (
       <div
@@ -326,13 +343,17 @@ ${rejected.guest_name}아, 제안해준 날짜는 아쉽게도 어려울 것 같
                 : "text-red-500"
             }`}
           >
-            {processed.proposal.guest_name}
+            {
+              processed.proposal
+                .guest_name
+            }
             님에게 메시지를
             보내주세요.
           </p>
         </div>
 
         {/* 제안 정보 */}
+
         <div className="bg-cream-100 rounded-xl px-3 py-3">
           <p className="font-semibold text-warm-gray-700">
             {
@@ -341,35 +362,15 @@ ${rejected.guest_name}아, 제안해준 날짜는 아쉽게도 어려울 것 같
             }
           </p>
 
-          <p className="text-sm text-warm-gray-500 mt-1">
-            {formatKoreanDate(
-              processed.proposal
-                .proposed_date
-            )}
-          </p>
-
-          <p className="text-xs text-warm-gray-400 mt-1">
-            🕐{" "}
-            {processed.proposal
-              .proposed_time &&
-            processed.proposal
-              .proposed_end_time
-              ? formatTimeRange(
-                  processed.proposal
-                    .proposed_time,
-                  processed.proposal
-                    .proposed_end_time
-                )
-              : processed.proposal
-                    .proposed_time
-                ? processed.proposal
-                    .proposed_time
-                    .slice(0, 5)
-                : "시간 미정"}
+          <p className="text-sm text-warm-gray-500 mt-1 leading-snug">
+            {
+              processedDateRange
+            }
           </p>
         </div>
 
         {/* 공유 버튼 */}
+
         <button
           type="button"
           onClick={() =>
@@ -394,6 +395,7 @@ ${rejected.guest_name}아, 제안해준 날짜는 아쉽게도 어려울 것 같
         </button>
 
         {/* 관리자 화면 갱신 */}
+
         <button
           type="button"
           onClick={() => {
@@ -410,6 +412,12 @@ ${rejected.guest_name}아, 제안해준 날짜는 아쉽게도 어려울 것 같
   // ============================================================
   // 기존 pending 카드
   // ============================================================
+
+  const proposalDateRange =
+    formatProposalDateRange(
+      proposal.proposed_date,
+      proposal.proposed_end_date
+    );
 
   return (
     <div className="card p-4 flex flex-col gap-3">
@@ -468,29 +476,13 @@ ${rejected.guest_name}아, 제안해준 날짜는 아쉽게도 어려울 것 같
         </p>
       </div>
 
-      {/* 날짜 / 시간 */}
+      {/* 날짜 */}
 
       <div className="bg-cream-100 rounded-xl px-3 py-3">
-        <p className="font-medium text-warm-gray-700">
-          {formatKoreanDate(
-            proposal.proposed_date
-          )}
-        </p>
-
-        <p className="text-sm text-warm-gray-400 mt-1">
-          🕐{" "}
-          {proposal.proposed_time &&
-          proposal.proposed_end_time
-            ? formatTimeRange(
-                proposal.proposed_time,
-                proposal.proposed_end_time
-              )
-            : proposal.proposed_time
-              ? proposal.proposed_time.slice(
-                  0,
-                  5
-                )
-              : "시간 협의"}
+        <p className="font-medium text-warm-gray-700 leading-snug">
+          {
+            proposalDateRange
+          }
         </p>
       </div>
 
@@ -564,7 +556,8 @@ export default function ProposalList({
     );
 
   if (
-    pending.length === 0
+    pending.length ===
+    0
   ) {
     return (
       <div className="card p-6 text-center">
