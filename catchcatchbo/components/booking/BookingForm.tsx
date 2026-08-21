@@ -328,13 +328,16 @@ export default function BookingForm({
       />
 
       {/* 연락처 */}
-      <Input
-        label="연락처 또는 카카오톡 이름 (선택)"
-        name="guest_contact"
-        type="text"
-        placeholder="카카오톡 이름이나 전화번호"
-        hint="확정 안내를 받을 수 있게 남겨주세요"
-      />
+<Input
+  label="연락처"
+  name="guest_contact"
+  type="tel"
+  required
+  placeholder="01012345678"
+  maxLength={13}
+  autoComplete="tel"
+  hint="예약 확인 및 변경할 때 사용해요"
+/>
 
       {/* 약속 이름 */}
       <Input
