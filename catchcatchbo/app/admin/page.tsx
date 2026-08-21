@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import AdminSlotCard from "@/components/admin/AdminSlotCard";
 import BookingList from "@/components/admin/BookingList";
 import ProposalList from "@/components/admin/ProposalList";
-import ProposalChangeRequestList from "@/components/admin/ProposalChangeRequestList";
+import ProposalChangeRequestList from "./ProposalChangeRequestList";
 import ShareSection from "@/components/admin/ShareSection";
 import { signOut } from "@/lib/actions/auth";
 import { APP_NAME } from "@/lib/constants";
