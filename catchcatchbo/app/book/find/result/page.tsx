@@ -206,7 +206,7 @@ const bookings =
   }
 
   const results =
-    bookings ?? [];
+  bookings;
 
   return (
     <div className="min-h-screen pb-20">
