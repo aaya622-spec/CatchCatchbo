@@ -126,12 +126,18 @@ export async function createBooking(
       ) as string
     )?.trim();
 
-  const guestContact =
-    (
-      formData.get(
-        "guest_contact"
-      ) as string
-    )?.trim() || null;
+  const rawGuestContact =
+  (
+    formData.get(
+      "guest_contact"
+    ) as string
+  )?.trim() || "";
+
+const guestContact =
+  rawGuestContact.replace(
+    /[^0-9]/g,
+    ""
+  );
 
   const bookingTitle =
     (
