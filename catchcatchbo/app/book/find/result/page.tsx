@@ -123,40 +123,54 @@ export default async function FindBookingResultPage({
     createAdminClient();
 
   const {
-    data: bookings,
-    error,
-  } = await supabase
-    .from("bookings")
-    .select(`
-      id,
-      manage_token,
-      guest_name,
-      booking_title,
-      guest_count,
-      meeting_type,
-      status,
-      created_at,
-      available_slots (
-        date,
-        end_date,
-        title,
-        location_text
-      )
-    `)
-    .eq(
-      "guest_name",
-      name
+  data: bookingRows,
+  error,
+} = await supabase
+  .from("bookings")
+  .select(`
+    id,
+    manage_token,
+    guest_name,
+    guest_contact,
+    booking_title,
+    guest_count,
+    meeting_type,
+    status,
+    created_at,
+    available_slots (
+      date,
+      end_date,
+      title,
+      location_text
     )
-    .eq(
-      "guest_contact",
-      contact
-    )
-    .order(
-      "created_at",
-      {
-        ascending: false,
-      }
-    );
+  `)
+  .eq(
+    "guest_name",
+    name
+  )
+  .order(
+    "created_at",
+    {
+      ascending: false,
+    }
+  );
+
+/*
+ * 예전 예약:
+ * 010-1234-5678
+ *
+ * 신규 예약:
+ * 01012345678
+ *
+ * 둘 다 같은 번호로 인식
+ */
+const bookings =
+  (bookingRows ?? []).filter(
+    (booking) =>
+      normalizeContact(
+        booking.guest_contact ?? ""
+      ) === contact
+  );
 
   if (error) {
     console.error(
