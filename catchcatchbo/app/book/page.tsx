@@ -34,11 +34,15 @@ export default async function BookPage() {
     .from("slots_with_count")
     .select("*")
     .eq("is_active", true)
-    .gte("date", today)
+
+    /*
+     * 시작일 기준으로만 자르면
+     * 어제 시작해서 오늘까지 이어지는 일정이
+     * 사라질 수 있으므로 end_date 기준으로 조회.
+     */
+    .gte("end_date", today)
+
     .order("date", {
-      ascending: true,
-    })
-    .order("start_time", {
       ascending: true,
     });
 
@@ -51,30 +55,68 @@ export default async function BookPage() {
 
   const slots: SlotWithCount[] = (
     rawSlots ?? []
-  ).map((slot) => ({
-    ...slot,
+  ).map((slot) => {
+    const startDate =
+      slot.date;
 
-    image_url:
-      slot.image_url ?? null,
+    const endDate =
+      slot.end_date ??
+      slot.date;
 
-    image_position:
-      slot.image_position ??
-      "center",
+    return {
+      ...slot,
 
-    booking_count:
-      slot.booking_count ?? 0,
+      // 시작일 / 종료일
+      date:
+        startDate,
 
-    remaining:
-      slot.remaining ?? 0,
+      end_date:
+        endDate,
 
-    is_full:
-      (slot.remaining ?? 0) ===
-      0,
-  }));
+      /*
+       * 기존 타입 / DB 호환용.
+       * 공개 화면에서는 더 이상 시간 표시용으로 사용하지 않음.
+       */
+      start_time:
+        slot.start_time ??
+        "00:00",
+
+      end_time:
+        slot.end_time ??
+        "23:59",
+
+      image_url:
+        slot.image_url ??
+        null,
+
+      image_position:
+        slot.image_position ??
+        "center",
+
+      image_text_color:
+        slot.image_text_color ??
+        "dark",
+
+      booking_count:
+        slot.booking_count ??
+        0,
+
+      remaining:
+        slot.remaining ??
+        0,
+
+      is_full:
+        (slot.remaining ??
+          0) === 0,
+    };
+  });
 
   return (
     <div className="min-h-screen pb-20">
+      {/* ====================================================== */}
       {/* 헤더 */}
+      {/* ====================================================== */}
+
       <header className="px-5 pt-8 pb-5">
         <div className="flex items-center gap-2 mb-4">
           <span className="text-2xl">
@@ -87,27 +129,41 @@ export default async function BookPage() {
         </div>
 
         <h1 className="text-xl font-bold text-warm-gray-800 leading-snug">
-          {BOOKING_PAGE_GREETING}
+          {
+            BOOKING_PAGE_GREETING
+          }
         </h1>
 
         <p className="text-sm text-warm-gray-500 mt-2 whitespace-pre-line leading-relaxed">
-          {BOOKING_PAGE_SUB}
+          {
+            BOOKING_PAGE_SUB
+          }
         </p>
       </header>
 
       <main className="px-5">
+        {/* ==================================================== */}
         {/* 공지 */}
+        {/* ==================================================== */}
+
         <div className="mb-5">
           <NoticeTicker />
         </div>
 
+        {/* ==================================================== */}
         {/* 추천 일정 자동 롤링 배너 */}
+        {/* ==================================================== */}
+
         <SlotBannerCarousel
           slots={slots}
         />
 
+        {/* ==================================================== */}
         {/* 캘린더 */}
-        {slots.length === 0 ? (
+        {/* ==================================================== */}
+
+        {slots.length ===
+        0 ? (
           <div className="card p-10 text-center mt-4">
             <p className="text-4xl mb-4">
               🌙
@@ -129,7 +185,10 @@ export default async function BookPage() {
           />
         )}
 
+        {/* ==================================================== */}
         {/* 날짜 제안 */}
+        {/* ==================================================== */}
+
         <section className="mt-8">
           <div className="card p-5 text-center">
             <div className="text-3xl mb-3">
@@ -141,10 +200,11 @@ export default async function BookPage() {
             </h2>
 
             <p className="text-sm text-warm-gray-400 mt-2 leading-relaxed">
-              만나고 싶은 날짜와 시간을
+              만나고 싶은 날짜를
               제안해 주세요.
               <br />
-              확인하고 알려드릴게요 😊
+              하루 일정도, 여러 날
+              일정도 괜찮아요 😊
             </p>
 
             <Link
@@ -156,6 +216,10 @@ export default async function BookPage() {
           </div>
         </section>
       </main>
+
+      {/* ====================================================== */}
+      {/* 푸터 */}
+      {/* ====================================================== */}
 
       <footer className="text-center py-10 text-xs text-warm-gray-300">
         {APP_NAME}으로 만들었어요
