@@ -15,6 +15,10 @@ type GoogleCalendarEventResponse = {
   };
 };
 
+// ============================================================
+// Google Access Token
+// ============================================================
+
 async function getGoogleAccessToken(): Promise<string> {
   const supabase = await createClient();
 
@@ -24,12 +28,19 @@ async function getGoogleAccessToken(): Promise<string> {
   } = await supabase.auth.getUser();
 
   if (authError || !user) {
-    throw new Error("로그인이 필요해요.");
+    throw new Error(
+      "로그인이 필요해요."
+    );
   }
 
-  const { data: token, error } = await supabase
+  const {
+    data: token,
+    error,
+  } = await supabase
     .from("google_tokens")
-    .select("access_token, refresh_token, expiry_date")
+    .select(
+      "access_token, refresh_token, expiry_date"
+    )
     .eq("user_id", user.id)
     .single();
 
@@ -39,12 +50,18 @@ async function getGoogleAccessToken(): Promise<string> {
     );
   }
 
-  const expiryDate = Number(token.expiry_date ?? 0);
+  const expiryDate =
+    Number(
+      token.expiry_date ??
+        0
+    );
 
   // 아직 유효한 토큰이면 그대로 사용
   if (
     token.access_token &&
-    expiryDate > Date.now() + 60_000
+    expiryDate >
+      Date.now() +
+        60_000
   ) {
     return token.access_token;
   }
@@ -56,39 +73,64 @@ async function getGoogleAccessToken(): Promise<string> {
   }
 
   const clientId =
-    process.env.GOOGLE_CLIENT_ID?.trim();
+    process.env
+      .GOOGLE_CLIENT_ID
+      ?.trim();
 
   const clientSecret =
-    process.env.GOOGLE_CLIENT_SECRET?.trim();
+    process.env
+      .GOOGLE_CLIENT_SECRET
+      ?.trim();
 
-  if (!clientId || !clientSecret) {
+  if (
+    !clientId ||
+    !clientSecret
+  ) {
     throw new Error(
       "Google 환경변수가 설정되지 않았어요."
     );
   }
 
-  const response = await fetch(
-    "https://oauth2.googleapis.com/token",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type":
-          "application/x-www-form-urlencoded",
-      },
-      body: new URLSearchParams({
-        client_id: clientId,
-        client_secret: clientSecret,
-        refresh_token: token.refresh_token,
-        grant_type: "refresh_token",
-      }),
-      cache: "no-store",
-    }
-  );
+  const response =
+    await fetch(
+      "https://oauth2.googleapis.com/token",
+      {
+        method: "POST",
+
+        headers: {
+          "Content-Type":
+            "application/x-www-form-urlencoded",
+        },
+
+        body:
+          new URLSearchParams(
+            {
+              client_id:
+                clientId,
+
+              client_secret:
+                clientSecret,
+
+              refresh_token:
+                token.refresh_token,
+
+              grant_type:
+                "refresh_token",
+            }
+          ),
+
+        cache:
+          "no-store",
+      }
+    );
 
   const refreshed =
     (await response.json()) as GoogleTokenResponse;
 
-  if (!response.ok || !refreshed.access_token) {
+  if (
+    !response.ok ||
+    !refreshed.access_token
+  ) {
     console.error(
       "Google access token refresh error:",
       refreshed
@@ -101,16 +143,31 @@ async function getGoogleAccessToken(): Promise<string> {
 
   const newExpiryDate =
     Date.now() +
-    (refreshed.expires_in ?? 3600) * 1000;
+    (refreshed.expires_in ??
+      3600) *
+      1000;
 
-  const { error: updateError } = await supabase
-    .from("google_tokens")
+  const {
+    error:
+      updateError,
+  } = await supabase
+    .from(
+      "google_tokens"
+    )
     .update({
-      access_token: refreshed.access_token,
-      expiry_date: newExpiryDate,
-      updated_at: new Date().toISOString(),
+      access_token:
+        refreshed.access_token,
+
+      expiry_date:
+        newExpiryDate,
+
+      updated_at:
+        new Date().toISOString(),
     })
-    .eq("user_id", user.id);
+    .eq(
+      "user_id",
+      user.id
+    );
 
   if (updateError) {
     console.error(
@@ -122,80 +179,185 @@ async function getGoogleAccessToken(): Promise<string> {
   return refreshed.access_token;
 }
 
+// ============================================================
+// 날짜 하루 더하기
+// Google Calendar 종일 일정의 end.date는 exclusive
+// 예: 9/5~9/7 일정 → end.date는 9/8
+// ============================================================
+
+function addOneDay(
+  dateString: string
+): string {
+  const [
+    year,
+    month,
+    day,
+  ] = dateString
+    .split("-")
+    .map(Number);
+
+  const date =
+    new Date(
+      Date.UTC(
+        year,
+        month - 1,
+        day
+      )
+    );
+
+  date.setUTCDate(
+    date.getUTCDate() + 1
+  );
+
+  return date
+    .toISOString()
+    .slice(0, 10);
+}
+
+// ============================================================
+// Google Calendar 일정 생성
+// ============================================================
+
 export async function createGoogleCalendarEvent(
   booking: Booking
 ): Promise<string> {
-  const slot = booking.available_slots;
+  const slot =
+    booking.available_slots;
 
   if (!slot) {
-    throw new Error("일정 정보가 없어요.");
+    throw new Error(
+      "일정 정보가 없어요."
+    );
   }
 
   const accessToken =
     await getGoogleAccessToken();
 
-  const startDateTime =
-    `${slot.date}T${slot.start_time.slice(0, 5)}:00+09:00`;
+  const startDate =
+    slot.date;
 
-  const endDateTime =
-    `${slot.date}T${slot.end_time.slice(0, 5)}:00+09:00`;
+  const endDate =
+    slot.end_date ??
+    slot.date;
+
+  if (!startDate) {
+    throw new Error(
+      "시작 날짜 정보가 없어요."
+    );
+  }
+
+  if (
+    endDate <
+    startDate
+  ) {
+    throw new Error(
+      "종료 날짜가 시작 날짜보다 빠를 수 없어요."
+    );
+  }
+
+  /*
+   * Google Calendar의 종일 일정은
+   * end.date가 실제 마지막 날의 다음 날이어야 합니다.
+   *
+   * 당일:
+   * 9/5 → start 9/5 / end 9/6
+   *
+   * 2박3일:
+   * 9/5~9/7 → start 9/5 / end 9/8
+   */
+
+  const googleEndDate =
+    addOneDay(
+      endDate
+    );
 
   const eventTitle =
     slot.title?.trim() ||
     `${booking.guest_name} · ${slot.meeting_type}`;
+
+  const dateText =
+    startDate === endDate
+      ? startDate
+      : `${startDate} ~ ${endDate}`;
 
   const description = [
     "캐치캐치보에서 확정된 약속입니다.",
     "",
     `예약자: ${booking.guest_name}`,
     `약속: ${booking.meeting_type}`,
-    `연락처: ${booking.guest_contact ?? "없음"}`,
-    `메모: ${booking.note ?? "없음"}`,
+    `날짜: ${dateText}`,
+    `연락처: ${
+      booking.guest_contact ??
+      "없음"
+    }`,
+    `메모: ${
+      booking.note ??
+      "없음"
+    }`,
     `예약 ID: ${booking.id}`,
   ].join("\n");
 
-  const response = await fetch(
-    "https://www.googleapis.com/calendar/v3/calendars/primary/events",
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        summary: `🎯 ${eventTitle}`,
-        description,
-        location: slot.location_text,
-        start: {
-          dateTime: startDateTime,
-          timeZone: "Asia/Seoul",
+  const response =
+    await fetch(
+      "https://www.googleapis.com/calendar/v3/calendars/primary/events",
+      {
+        method:
+          "POST",
+
+        headers: {
+          Authorization:
+            `Bearer ${accessToken}`,
+
+          "Content-Type":
+            "application/json",
         },
-        end: {
-          dateTime: endDateTime,
-          timeZone: "Asia/Seoul",
-        },
-        reminders: {
-          useDefault: false,
-          overrides: [
-            {
-              method: "popup",
-              minutes: 60,
+
+        body:
+          JSON.stringify({
+            summary:
+              `🎯 ${eventTitle}`,
+
+            description,
+
+            location:
+              slot.location_text,
+
+            /*
+             * 종일 일정
+             * dateTime이 아니라 date 사용
+             */
+            start: {
+              date:
+                startDate,
             },
-            {
-              method: "popup",
-              minutes: 10,
+
+            end: {
+              date:
+                googleEndDate,
             },
-          ],
-        },
-      }),
-      cache: "no-store",
-    }
-  );
+
+            /*
+             * 종일 일정은 시간 기반 알림 대신
+             * 기본 알림을 사용.
+             */
+            reminders: {
+              useDefault:
+                true,
+            },
+          }),
+
+        cache:
+          "no-store",
+      }
+    );
 
   const event =
     (await response.json()) as GoogleCalendarEventResponse;
 
-  if (!response.ok || !event.id) {
+  if (
+    !response.ok ||
+    !event.id
+  ) {
     console.error(
       "Google Calendar event creation error:",
       event
@@ -210,28 +372,43 @@ export async function createGoogleCalendarEvent(
   return event.id;
 }
 
+// ============================================================
+// Google Calendar 일정 삭제
+// ============================================================
+
 export async function deleteGoogleCalendarEvent(
   eventId: string
 ): Promise<void> {
   const accessToken =
     await getGoogleAccessToken();
 
-  const response = await fetch(
-    `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(
-      eventId
-    )}`,
-    {
-      method: "DELETE",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-      cache: "no-store",
-    }
-  );
+  const response =
+    await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(
+        eventId
+      )}`,
+      {
+        method:
+          "DELETE",
 
-  // 이미 캘린더에서 삭제된 경우도 성공으로 처리
-  if (!response.ok && response.status !== 404) {
-    const errorText = await response.text();
+        headers: {
+          Authorization:
+            `Bearer ${accessToken}`,
+        },
+
+        cache:
+          "no-store",
+      }
+    );
+
+  // 이미 캘린더에서 삭제된 경우도 성공 처리
+  if (
+    !response.ok &&
+    response.status !==
+      404
+  ) {
+    const errorText =
+      await response.text();
 
     console.error(
       "Google Calendar event deletion error:",
