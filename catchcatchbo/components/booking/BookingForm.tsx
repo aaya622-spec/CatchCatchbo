@@ -112,9 +112,7 @@ function CompletionScreen({
             </span>
 
             <span className="font-semibold text-warm-gray-700 text-right">
-              {
-                booking.booking_title
-              }
+              {booking.booking_title}
             </span>
           </div>
 
@@ -136,9 +134,7 @@ function CompletionScreen({
             </span>
 
             <span className="font-medium text-warm-gray-700">
-              {
-                booking.guest_name
-              }
+              {booking.guest_name}
             </span>
           </div>
 
@@ -149,10 +145,7 @@ function CompletionScreen({
             </span>
 
             <span className="font-medium text-warm-gray-700">
-              {
-                booking.guest_count
-              }
-              명
+              {booking.guest_count}명
             </span>
           </div>
 
@@ -187,7 +180,7 @@ function CompletionScreen({
         </div>
       </div>
 
-     {/* 내 예약 관리 */}
+      {/* 내 예약 관리 */}
       <Link
         href={`/book/manage/${booking.manage_token}`}
         className="btn-secondary w-full text-center mt-5"
@@ -195,12 +188,16 @@ function CompletionScreen({
         내 예약 확인 / 변경하기
       </Link>
 
-      <p className="text-xs text-warm-gray-300 mt-4">
-        이 링크에서 예약 내용을 확인하거나
-        변경할 수 있어요.
+      <p className="text-xs text-warm-gray-300 mt-4 leading-relaxed">
+        이 링크에서 예약 내용을
+        확인하거나 변경할 수 있어요.
         <br />
-        링크를 잃어버리지 않게 저장해주세요 😊
+        링크를 잃어버리지 않게
+        저장해주세요 😊
       </p>
+    </div>
+  );
+}
 
 // ============================================================
 // 예약 신청 폼
@@ -215,7 +212,9 @@ export default function BookingForm({
   ] = useTransition();
 
   const [error, setError] =
-    useState<string | null>(null);
+    useState<string | null>(
+      null
+    );
 
   const [
     completedBooking,
