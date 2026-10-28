@@ -420,3 +420,61 @@ export async function deleteGoogleCalendarEvent(
     );
   }
 }
+
+
+// 기존 이벤트 ID를 유지하며 날짜·시간·제목·메모를 갱신합니다.
+export async function updateGoogleCalendarEvent(
+  eventId: string,
+  booking: Booking,
+): Promise<void> {
+  const slot = booking.available_slots;
+  if (!slot) throw new Error("일정 정보를 찾을 수 없어요.");
+  const token = await getGoogleAccessToken();
+  const allDay =
+    slot.start_time.slice(0, 5) === "00:00" &&
+    slot.end_time.slice(0, 5) === "23:59";
+  const body = {
+    summary: `🎯 ${booking.booking_title}`,
+    location: slot.location_text,
+    description: [
+      `예약자: ${booking.guest_name}`,
+      `인원: ${booking.guest_count}명`,
+      `약속: ${booking.meeting_type}`,
+      `메모: ${booking.note || "없음"}`,
+      `예약 ID: ${booking.id}`,
+    ].join("\n"),
+    start: allDay
+      ? { date: slot.date }
+      : {
+          dateTime: `${slot.date}T${slot.start_time.slice(0, 5)}:00+09:00`,
+          timeZone: "Asia/Seoul",
+        },
+    end: allDay
+      ? { date: addOneDay(slot.end_date || slot.date) }
+      : {
+          dateTime: `${slot.end_date || slot.date}T${slot.end_time.slice(0, 5)}:00+09:00`,
+          timeZone: "Asia/Seoul",
+        },
+  };
+  const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(eventId)}`;
+  const existingResponse = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
+  });
+  if (!existingResponse.ok)
+    throw new Error("기존 Google Calendar 일정을 찾을 수 없어요.");
+  const existing = await existingResponse.json();
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${token}`,
+    "Content-Type": "application/json",
+  };
+  if (existing.etag) headers["If-Match"] = existing.etag;
+  const response = await fetch(url, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+  if (!response.ok)
+    throw new Error("Google Calendar 일정을 갱신하지 못했어요.");
+}

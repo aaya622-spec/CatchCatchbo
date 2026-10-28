@@ -37,10 +37,7 @@ export interface AvailableSlot {
 // 예약
 // ============================================================
 
-export type BookingStatus =
-  | "pending"
-  | "confirmed"
-  | "canceled";
+export type BookingStatus = "pending" | "confirmed" | "canceled";
 
 export interface Booking {
   id: string;
@@ -79,10 +76,7 @@ export interface Booking {
 // 날짜 제안
 // ============================================================
 
-export type DateProposalStatus =
-  | "pending"
-  | "accepted"
-  | "rejected";
+export type DateProposalStatus = "pending" | "accepted" | "rejected";
 
 export interface DateProposal {
   id: string;
@@ -113,8 +107,9 @@ export interface DateProposal {
 // 슬롯 + 예약 현황
 // ============================================================
 
-export interface SlotWithCount
-  extends AvailableSlot {
+export interface SlotWithCount extends AvailableSlot {
+  personal_event?: boolean;
+  all_day?: boolean;
   booking_count: number;
   remaining: number;
   is_full: boolean;
@@ -142,9 +137,7 @@ export interface SlotFormData {
 
   image_url: string;
   image_position: string;
-  image_text_color:
-    | "dark"
-    | "light";
+  image_text_color: "dark" | "light";
 
   max_guests: number;
 }
@@ -191,9 +184,7 @@ export interface DateProposalFormData {
 // Server Action 공통 응답
 // ============================================================
 
-export interface ActionResult<
-  T = void
-> {
+export interface ActionResult<T = void> {
   success: boolean;
   data?: T;
   error?: string;

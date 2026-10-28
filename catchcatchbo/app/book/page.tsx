@@ -1,3 +1,8 @@
+import {
+  personalAsSlot,
+  personalBlocksSlot,
+  type PersonalEvent,
+} from "@/lib/personal-events";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import BookingCalendar from "@/components/booking/BookingCalendar";
@@ -77,6 +82,22 @@ export default async function BookPage() {
     };
   });
 
+  const { data: eventRows, error: eventError } = await supabase
+    .from("personal_events")
+    .select("*")
+    .gte("end_date", today)
+    .order("date");
+  const events: PersonalEvent[] = eventRows ?? [];
+  const publicSlots = slots.map((slot) =>
+    events.some((e) => personalBlocksSlot(e, slot))
+      ? { ...slot, remaining: 0, is_full: true }
+      : slot,
+  );
+  const calendarSlots = [...publicSlots, ...events.map(personalAsSlot)].sort(
+    (a, b) => a.date.localeCompare(b.date),
+  );
+  if (eventError) console.error("Personal events unavailable:", eventError);
+
   return (
     <div className="min-h-screen pb-20">
       {/* ====================================================== */}
@@ -114,13 +135,13 @@ export default async function BookPage() {
         {/* 추천 일정 자동 롤링 배너 */}
         {/* ==================================================== */}
 
-        <SlotBannerCarousel slots={slots} />
+        <SlotBannerCarousel slots={publicSlots.filter((s) => !s.is_full)} />
 
         {/* ==================================================== */}
         {/* 캘린더 */}
         {/* ==================================================== */}
 
-        {slots.length === 0 ? (
+        {calendarSlots.length === 0 ? (
           <div className="card p-10 text-center mt-4">
             <p className="text-4xl mb-4">🌙</p>
 
@@ -133,7 +154,7 @@ export default async function BookPage() {
             </p>
           </div>
         ) : (
-          <BookingCalendar slots={slots} />
+          <BookingCalendar slots={calendarSlots} />
         )}
 
         {/* ==================================================== */}
@@ -177,8 +198,7 @@ export default async function BookPage() {
 
             <p className="text-sm text-warm-gray-400 mt-2 leading-relaxed">
               예약할 때 입력한 이름과 연락처로
-              <br />
-              내 예약을 확인하거나 변경할 수 있어요.
+              <br />내 예약을 확인하거나 변경할 수 있어요.
             </p>
 
             <Link

@@ -1,11 +1,9 @@
+import { personalBlocksSlot } from "@/lib/personal-events";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import BookingForm from "@/components/booking/BookingForm";
-import {
-  MeetingTypeBadge,
-  RemainingBadge,
-} from "@/components/ui/Badge";
+import { MeetingTypeBadge, RemainingBadge } from "@/components/ui/Badge";
 import {
   formatKoreanDate,
   getMeetingTypeLabel,
@@ -26,48 +24,28 @@ interface BookingPageProps {
 // 날짜 범위 표시
 // ============================================================
 
-function formatDateRange(
-  startDate: string,
-  endDate?: string | null
-): string {
-  const finalEndDate =
-    endDate || startDate;
+function formatDateRange(startDate: string, endDate?: string | null): string {
+  const finalEndDate = endDate || startDate;
 
-  if (
-    startDate === finalEndDate
-  ) {
-    return formatKoreanDate(
-      startDate
-    );
+  if (startDate === finalEndDate) {
+    return formatKoreanDate(startDate);
   }
 
-  return `${formatKoreanDate(
-    startDate
-  )} ~ ${formatKoreanDate(
-    finalEndDate
-  )}`;
+  return `${formatKoreanDate(startDate)} ~ ${formatKoreanDate(finalEndDate)}`;
 }
 
 // ============================================================
 // 예약 상세 페이지
 // ============================================================
 
-export default async function BookingPage({
-  params,
-}: BookingPageProps) {
-  const { slotId } =
-    await params;
+export default async function BookingPage({ params }: BookingPageProps) {
+  const { slotId } = await params;
 
-  const supabase =
-    await createClient();
+  const supabase = await createClient();
 
-  const today =
-    getTodayKST();
+  const today = getTodayKST();
 
-  const {
-    data: rawSlot,
-    error,
-  } = await supabase
+  const { data: rawSlot, error } = await supabase
     .from("slots_with_count")
     .select("*")
     .eq("id", slotId)
@@ -81,64 +59,60 @@ export default async function BookingPage({
 
     .single();
 
-  if (
-    error ||
-    !rawSlot
-  ) {
+  if (error || !rawSlot) {
     notFound();
   }
 
   const slot: SlotWithCount = {
     ...rawSlot,
 
-    date:
-      rawSlot.date,
+    date: rawSlot.date,
 
-    end_date:
-      rawSlot.end_date ??
-      rawSlot.date,
+    end_date: rawSlot.end_date ?? rawSlot.date,
 
     /*
      * 기존 DB / 타입 호환용
      */
-    start_time:
-      rawSlot.start_time ??
-      "00:00",
+    start_time: rawSlot.start_time ?? "00:00",
 
-    end_time:
-      rawSlot.end_time ??
-      "23:59",
+    end_time: rawSlot.end_time ?? "23:59",
 
-    image_url:
-      rawSlot.image_url ??
-      null,
+    image_url: rawSlot.image_url ?? null,
 
-    image_position:
-      rawSlot.image_position ??
-      "center",
+    image_position: rawSlot.image_position ?? "center",
 
-    image_text_color:
-      rawSlot.image_text_color ??
-      "dark",
+    image_text_color: rawSlot.image_text_color ?? "dark",
 
-    booking_count:
-      rawSlot.booking_count ??
-      0,
+    booking_count: rawSlot.booking_count ?? 0,
 
-    remaining:
-      rawSlot.remaining ??
-      0,
+    remaining: rawSlot.remaining ?? 0,
 
-    is_full:
-      (rawSlot.remaining ??
-        0) === 0,
+    is_full: (rawSlot.remaining ?? 0) === 0,
   };
 
-  const dateRange =
-    formatDateRange(
-      slot.date,
-      slot.end_date
+  const { data: personalEvents, error: personalError } = await supabase
+    .from("personal_events")
+    .select("*")
+    .eq("owner_id", slot.owner_id)
+    .lte("date", slot.end_date)
+    .gte("end_date", slot.date);
+  if (personalError)
+    return (
+      <main className="p-8">
+        일정을 확인하지 못했어요. 잠시 후 다시 시도해주세요.
+      </main>
     );
+  if ((personalEvents ?? []).some((e) => personalBlocksSlot(e, slot)))
+    return (
+      <main className="p-8 flex flex-col gap-4">
+        <h1>이미 개인 일정이 있는 시간이에요.</h1>
+        <Link href="/book" className="btn-secondary">
+          다른 일정 보기
+        </Link>
+      </main>
+    );
+
+  const dateRange = formatDateRange(slot.date, slot.end_date);
 
   return (
     <div className="min-h-screen pb-20">
@@ -148,10 +122,7 @@ export default async function BookingPage({
 
       <header className="sticky top-0 z-10 bg-cream-100/90 backdrop-blur-sm border-b border-cream-200 px-5 py-4">
         <div className="flex items-center gap-3">
-          <Link
-            href="/book"
-            className="btn-ghost p-2 -ml-2"
-          >
+          <Link href="/book" className="btn-ghost p-2 -ml-2">
             <svg
               width="20"
               height="20"
@@ -168,9 +139,7 @@ export default async function BookingPage({
             </svg>
           </Link>
 
-          <span className="text-sm text-warm-gray-500">
-            다른 날 보기
-          </span>
+          <span className="text-sm text-warm-gray-500">다른 날 보기</span>
         </div>
       </header>
 
@@ -186,17 +155,14 @@ export default async function BookingPage({
             <h1 className="text-xl font-bold text-warm-gray-800 leading-snug">
               {dateRange}
             </h1>
+            <p className="text-sm text-warm-gray-500 mt-2">
+              {slot.start_time.slice(0, 5)} ~ {slot.end_time.slice(0, 5)} (한국
+              시간)
+            </p>
           </div>
 
           <div className="shrink-0">
-            <RemainingBadge
-              remaining={
-                slot.remaining
-              }
-              max={
-                slot.max_guests
-              }
-            />
+            <RemainingBadge remaining={slot.remaining} max={slot.max_guests} />
           </div>
         </div>
 
@@ -212,19 +178,12 @@ export default async function BookingPage({
 
         <div className="flex items-center gap-2 flex-wrap">
           <MeetingTypeBadge
-            value={
-              slot.meeting_type
-            }
-            label={getMeetingTypeLabel(
-              slot.meeting_type
-            )}
+            value={slot.meeting_type}
+            label={getMeetingTypeLabel(slot.meeting_type)}
           />
 
           <span className="text-sm text-warm-gray-400">
-            📍{" "}
-            {getLocationLabel(
-              slot.location_text
-            )}
+            📍 {getLocationLabel(slot.location_text)}
           </span>
         </div>
 
@@ -232,9 +191,7 @@ export default async function BookingPage({
 
         {slot.description && (
           <p className="text-sm text-warm-gray-400 mt-3 bg-cream-100 rounded-xl px-3 py-2 leading-relaxed">
-            {
-              slot.description
-            }
+            {slot.description}
           </p>
         )}
       </div>
@@ -244,9 +201,7 @@ export default async function BookingPage({
       {/* ====================================================== */}
 
       <div className="pt-6">
-        <BookingForm
-          slot={slot}
-        />
+        <BookingForm slot={slot} />
       </div>
     </div>
   );
