@@ -108,6 +108,7 @@ export interface DateProposal {
 // ============================================================
 
 export interface SlotWithCount extends AvailableSlot {
+  invitation_pending?: boolean;
   personal_event?: boolean;
   all_day?: boolean;
   booking_count: number;

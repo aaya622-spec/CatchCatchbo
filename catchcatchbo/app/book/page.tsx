@@ -1,3 +1,4 @@
+import { holdAsSlot, holdBlocksSlot, type InvitationHold } from "@/lib/invitations";
 import {
   personalAsSlot,
   personalBlocksSlot,
@@ -88,12 +89,15 @@ export default async function BookPage() {
     .gte("end_date", today)
     .order("date");
   const events: PersonalEvent[] = eventRows ?? [];
-  const publicSlots = slots.map((slot) =>
+  const { data: holdRows, error: holdError } = await supabase.from("invitation_holds").select("*").gte("end_date", today);
+  const holds: InvitationHold[] = holdRows ?? [];
+  if (holdError) console.error("Invitation holds unavailable:", holdError);
+  const publicSlots = slots.filter(slot => !holds.some(h => holdBlocksSlot(h, slot) && h.slot_id !== slot.id)).map((slot) =>
     events.some((e) => personalBlocksSlot(e, slot))
       ? { ...slot, remaining: 0, is_full: true }
       : slot,
   );
-  const calendarSlots = [...publicSlots, ...events.map(personalAsSlot)].sort(
+  const calendarSlots = [...publicSlots, ...events.map(personalAsSlot), ...holds.filter(h => h.status === "pending").map(holdAsSlot)].sort(
     (a, b) => a.date.localeCompare(b.date),
   );
   if (eventError) console.error("Personal events unavailable:", eventError);

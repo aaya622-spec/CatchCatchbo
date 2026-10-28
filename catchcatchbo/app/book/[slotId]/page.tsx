@@ -112,6 +112,10 @@ export default async function BookingPage({ params }: BookingPageProps) {
       </main>
     );
 
+  const { data: holds, error: holdsError } = await supabase.from("invitation_holds").select("id,slot_id")
+    .eq("owner_id", slot.owner_id).lte("date", slot.end_date).gte("end_date", slot.date);
+  if (holdsError || (holds ?? []).some(h => h.slot_id !== slot.id)) return <main className="p-8 flex flex-col gap-4"><h1>이미 약속이 있거나 초대 응답을 기다리는 날짜예요.</h1><Link href="/book" className="btn-secondary">다른 일정 보기</Link></main>;
+
   const dateRange = formatDateRange(slot.date, slot.end_date);
 
   return (

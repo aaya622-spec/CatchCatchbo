@@ -311,7 +311,7 @@ export default function BookingCalendar({ slots }: BookingCalendarProps) {
 
   function getDateStatus(
     dateString: string,
-  ): "available" | "full" | "mixed" | "personal" | null {
+  ): "available" | "full" | "mixed" | "personal" | "invitation" | null {
     const dateSlots = slotsByDate.get(dateString);
 
     if (!dateSlots || dateSlots.length === 0) {
@@ -323,6 +323,8 @@ export default function BookingCalendar({ slots }: BookingCalendarProps) {
       !dateSlots.some((slot) => !slot.is_full)
     )
       return "personal";
+
+    if (dateSlots.some(slot => slot.invitation_pending)) return "invitation";
 
     const availableCount = dateSlots.filter((slot) => !slot.is_full).length;
 
@@ -442,7 +444,9 @@ export default function BookingCalendar({ slots }: BookingCalendarProps) {
                 {status && (
                   <span
                     className={`absolute bottom-1.5 w-1.5 h-1.5 rounded-full ${
-                      status === "personal"
+                      status === "invitation"
+                        ? "bg-amber-400"
+                        : status === "personal"
                         ? "bg-purple-400"
                         : status === "available"
                           ? "bg-green-400"
@@ -476,7 +480,7 @@ export default function BookingCalendar({ slots }: BookingCalendarProps) {
 
           <div className="flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-            여러 일정
+            여러 일정·응답 대기
           </div>
         </div>
       </section>

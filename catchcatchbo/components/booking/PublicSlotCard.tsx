@@ -15,13 +15,13 @@ function formatDateRange(startDate: string, endDate?: string | null): string {
 
 export default function PublicSlotCard({ slot }: PublicSlotCardProps) {
   const personal = !!slot.personal_event;
-  const full = personal || slot.is_full || slot.remaining <= 0;
+  const full = !!slot.invitation_pending || personal || slot.is_full || slot.remaining <= 0;
   const allDay = personal
     ? slot.all_day
     : slot.start_time.slice(0, 5) === "00:00" && slot.end_time.slice(0, 5) === "23:59";
-  const border = personal ? "border-purple-300" : full ? "border-red-300" : "border-green-300";
-  const labelColor = personal ? "text-purple-600" : full ? "text-red-500" : "text-green-600";
-  const label = personal
+  const border = slot.invitation_pending ? "border-amber-300" : personal ? "border-purple-300" : full ? "border-red-300" : "border-green-300";
+  const labelColor = slot.invitation_pending ? "text-amber-600" : personal ? "text-purple-600" : full ? "text-red-500" : "text-green-600";
+  const label = slot.invitation_pending ? "🟡 약속 초대 · 응답 대기" : personal
     ? "🟣 개인 일정 · 이미 일정 있음"
     : full
       ? "🔴 약속 · 이미 일정 있음"

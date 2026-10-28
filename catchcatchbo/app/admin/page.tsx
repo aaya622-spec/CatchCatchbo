@@ -1,3 +1,5 @@
+import InvitationManager from "@/components/admin/InvitationManager";
+import type { Invitation } from "@/lib/invitations";
 import PersonalEventManager from "@/components/admin/PersonalEventManager";
 import { redirect } from "next/navigation";
 import Link from "next/link";
@@ -210,6 +212,10 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const adminSupabase = createAdminClient();
 
   const today = getTodayKST();
+  const { data: invitations, error: invitationsError } = await supabase
+    .from("appointment_invitations")
+    .select("*,appointment_invitees(id,name,token,status,position)")
+    .eq("owner_id", user.id).gte("end_date", today).order("created_at", { ascending: false });
 
   const { data: personalEvents, error: personalError } = await supabase
     .from("personal_events")
@@ -856,6 +862,8 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                 + 날짜 열기
               </Link>
             </div>
+
+            {invitationsError ? <section id="invitations"><Link href="/admin/invitations/new" className="btn-secondary">+ 약속 직접 등록</Link><p className="text-sm text-warm-gray-500 mt-2">초대 기능 SQL을 적용하면 초대 목록을 볼 수 있어요.</p></section> : <InvitationManager invitations={(invitations ?? []) as Invitation[]} />}
 
             {personalError ? (
               <p role="alert" className="text-red-500">
