@@ -1,12 +1,14 @@
 "use server";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { syncPersonalGoogleCalendarEvent, deletePersonalGoogleCalendarEvent } from "@/lib/google/calendar";
+import type { PersonalEvent } from "@/lib/personal-events";
 import type { ActionResult } from "@/lib/types";
 
 export async function savePersonalEvent(
   id: string | null,
   form: FormData,
-): Promise<ActionResult> {
+): Promise<ActionResult<{ warning?: string }>> {
   const db = await createClient();
   const {
     data: { user },
@@ -52,15 +54,23 @@ export async function savePersonalEvent(
         .eq("id", id)
         .eq("owner_id", user.id)
     : db.from("personal_events").insert(values);
-  const { data, error } = await query.select("id").single();
+  const { data, error } = await query.select("*").single();
   if (error || !data)
     return {
       success: false,
       error: error?.message || "저장할 일정을 찾을 수 없어요.",
     };
+  let warning: string | undefined;
+  try {
+    await syncPersonalGoogleCalendarEvent(data as PersonalEvent);
+  } catch (err) {
+    console.error("Personal calendar sync failed", err);
+    warning = "개인 일정은 앱에 저장됐지만 캘린더 연동에 실패했어요. " +
+      (err instanceof Error ? err.message : "아래 캘린더 연동 버튼으로 다시 시도해주세요.");
+  }
   revalidatePath("/admin");
   revalidatePath("/book", "layout");
-  return { success: true };
+  return { success: true, data: { warning } };
 }
 export async function deletePersonalEvent(id: string): Promise<ActionResult> {
   const db = await createClient();
@@ -68,6 +78,21 @@ export async function deletePersonalEvent(id: string): Promise<ActionResult> {
     data: { user },
   } = await db.auth.getUser();
   if (!user) return { success: false, error: "로그인이 필요해요." };
+  const { data: event, error: lookupError } = await db
+    .from("personal_events")
+    .select("*")
+    .eq("id", id)
+    .eq("owner_id", user.id)
+    .single();
+  if (lookupError || !event) return { success: false, error: "삭제할 개인 일정을 찾을 수 없어요." };
+  // 캘린더 삭제에 실패하면 앱 일정을 남겨 다시 삭제할 수 있게 합니다.
+  try {
+    await deletePersonalGoogleCalendarEvent(event as PersonalEvent);
+  } catch (err) {
+    console.error("Personal calendar delete failed", err);
+    return { success: false, error: "개인 일정을 삭제하지 않았어요. " +
+      (err instanceof Error ? err.message : "캘린더 연결을 확인한 뒤 다시 시도해주세요.") };
+  }
   const { data, error } = await db
     .from("personal_events")
     .delete()
@@ -78,9 +103,25 @@ export async function deletePersonalEvent(id: string): Promise<ActionResult> {
   if (error || !data)
     return {
       success: false,
-      error: "일정을 삭제하지 못했어요. 다시 확인해주세요.",
+      error: "캘린더에서는 삭제했지만 앱 일정 삭제를 완료하지 못했어요. 다시 삭제해주세요.",
     };
   revalidatePath("/admin");
   revalidatePath("/book", "layout");
   return { success: true };
+}
+
+export async function syncPersonalEvent(id: string): Promise<ActionResult> {
+  const db = await createClient();
+  const { data: { user } } = await db.auth.getUser();
+  if (!user) return { success: false, error: "로그인이 필요해요." };
+  const { data, error } = await db.from("personal_events").select("*")
+    .eq("id", id).eq("owner_id", user.id).single();
+  if (error || !data) return { success: false, error: "연동할 개인 일정을 찾을 수 없어요." };
+  try {
+    await syncPersonalGoogleCalendarEvent(data as PersonalEvent);
+    return { success: true };
+  } catch (err) {
+    console.error("Personal calendar retry failed", err);
+    return { success: false, error: err instanceof Error ? err.message : "캘린더 연동에 실패했어요." };
+  }
 }

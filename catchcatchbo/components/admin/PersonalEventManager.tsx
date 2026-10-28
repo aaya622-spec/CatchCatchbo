@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import {
   savePersonalEvent,
   deletePersonalEvent,
+  syncPersonalEvent,
 } from "@/lib/actions/personalEvents";
 import type { PersonalEvent } from "@/lib/personal-events";
 import { getTodayKST } from "@/lib/utils";
@@ -17,6 +18,7 @@ export default function PersonalEventManager({
   const [editing, setEditing] = useState<PersonalEvent | "new" | null>(null);
   const [allDay, setAllDay] = useState(true);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [pending, start] = useTransition();
   const current = editing && editing !== "new" ? editing : null;
   function open(event: PersonalEvent | "new") {
@@ -38,8 +40,31 @@ export default function PersonalEventManager({
         </button>
       </div>
       <p className="text-xs text-warm-gray-500">
-        제목과 메모가 친구들에게도 보여요. 겹치는 시간은 예약할 수 없어요.
+        제목과 메모가 친구들에게도 보여요. 저장·수정·삭제하면 연결된 Google Calendar에도 반영돼요.
       </p>
+      {events.length > 0 && (
+        <button type="button" className="btn-secondary text-sm" disabled={pending}
+          onClick={() => {
+            setError(""); setNotice("");
+            start(async () => {
+              let succeeded = 0;
+              const failed: string[] = [];
+              for (const event of events) {
+                setNotice(`캘린더 연동 중… ${succeeded + failed.length + 1}/${events.length}`);
+                try {
+                  const result = await syncPersonalEvent(event.id);
+                  if (result.success) succeeded++;
+                  else failed.push(`${event.title}: ${result.error || "연동 실패"}`);
+                } catch { failed.push(`${event.title}: 연결을 확인해주세요.`); }
+              }
+              setNotice(`${succeeded}개 일정의 캘린더 연동을 완료했어요.`);
+              if (failed.length) setError(failed.join("\n"));
+            });
+          }}>
+          {pending ? "처리 중…" : "기존 개인 일정 전체 캘린더 연동"}
+        </button>
+      )}
+      {notice && <p role="status" className="text-sm text-warm-gray-700 whitespace-pre-wrap">{notice}</p>}
       {editing && (
         <form
           key={current?.id || "new"}
@@ -48,6 +73,7 @@ export default function PersonalEventManager({
             e.preventDefault();
             const form = new FormData(e.currentTarget);
             setError("");
+            setNotice("");
             start(async () => {
               try {
                 const r = await savePersonalEvent(current?.id || null, form);
@@ -56,6 +82,7 @@ export default function PersonalEventManager({
                   return;
                 }
                 setEditing(null);
+                setNotice(r.data?.warning || "개인 일정을 저장하고 Google Calendar에도 반영했어요.");
                 router.refresh();
               } catch {
                 setError("연결에 실패했어요. 다시 시도해주세요.");
@@ -153,7 +180,7 @@ export default function PersonalEventManager({
         </form>
       )}
       {error && (
-        <p role="alert" className="text-sm text-red-500">
+        <p role="alert" className="text-sm text-red-500 whitespace-pre-wrap">
           {error}
         </p>
       )}
@@ -183,10 +210,21 @@ export default function PersonalEventManager({
             >
               수정
             </button>
+            <button type="button" disabled={pending} className="text-sm text-purple-600"
+              onClick={() => {
+                setError(""); setNotice("");
+                start(async () => {
+                  try {
+                    const result = await syncPersonalEvent(e.id);
+                    if (!result.success) setError(result.error || "연동 실패");
+                    else setNotice(`‘${e.title}’ 일정을 Google Calendar에 반영했어요.`);
+                  } catch { setError("연결에 실패했어요. 다시 연동해주세요."); }
+                });
+              }}>캘린더 연동</button>
             <button
               type="button"
               disabled={pending}
-              className="text-sm text-red-500"
+              className="text-sm text-red-500 whitespace-pre-wrap"
               onClick={() => {
                 if (!confirm(`‘${e.title}’ 일정을 삭제할까요?`)) return;
                 setError("");
@@ -194,7 +232,10 @@ export default function PersonalEventManager({
                   try {
                     const r = await deletePersonalEvent(e.id);
                     if (!r.success) setError(r.error || "삭제 실패");
-                    else router.refresh();
+                    else {
+                      setNotice("개인 일정을 앱과 Google Calendar에서 삭제했어요.");
+                      router.refresh();
+                    }
                   } catch {
                     setError("연결에 실패했어요.");
                   }

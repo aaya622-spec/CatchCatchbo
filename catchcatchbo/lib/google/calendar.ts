@@ -478,3 +478,122 @@ export async function updateGoogleCalendarEvent(
   if (!response.ok)
     throw new Error("Google Calendar 일정을 갱신하지 못했어요.");
 }
+
+// 개인 일정 전용: 기존 예약의 생성·삭제 함수와 별도로 처리합니다.
+// 고정 ID로 재시도 시 동일한 Google 이벤트를 갱신합니다.
+function personalCalendarId(id: string): string {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) {
+    throw new Error("개인 일정 ID가 올바르지 않아요.");
+  }
+  return `ccbpersonal${id.replace(/-/g, "").toLowerCase()}`;
+}
+
+type PersonalCalendarRecord = {
+  etag?: string;
+  status?: string;
+  extendedProperties?: { private?: Record<string, string> };
+};
+
+function assertPersonalCalendarOwner(
+  record: PersonalCalendarRecord,
+  event: import("@/lib/personal-events").PersonalEvent,
+) {
+  const tags = record.extendedProperties?.private;
+  if (tags?.ccb_personal_id !== event.id || tags?.ccb_owner_id !== event.owner_id) {
+    throw new Error("기존 캘린더 일정의 연결 정보를 확인하지 못했어요.");
+  }
+}
+
+export async function syncPersonalGoogleCalendarEvent(
+  event: import("@/lib/personal-events").PersonalEvent,
+): Promise<void> {
+  const token = await getGoogleAccessToken();
+  const id = personalCalendarId(event.id);
+  const base = "https://www.googleapis.com/calendar/v3/calendars/primary/events";
+  const url = `${base}/${id}`;
+  const headers = {
+    Authorization: `Bearer ${token}`,
+    "Content-Type": "application/json",
+  };
+  // null은 종일↔시간 지정 변경 시 이전 시간 필드를 제거합니다.
+  const body = {
+    summary: `🟣 ${event.title}`,
+    description: [event.note || "", "", "캐치캐치보 개인 일정"].join("\n"),
+    start: event.all_day
+      ? { date: event.date, dateTime: null, timeZone: null }
+      : {
+          date: null,
+          dateTime: `${event.date}T${event.start_time.slice(0, 5)}:00+09:00`,
+          timeZone: "Asia/Seoul",
+        },
+    end: event.all_day
+      ? { date: addOneDay(event.end_date), dateTime: null, timeZone: null }
+      : {
+          date: null,
+          dateTime: event.end_time.slice(0, 5) === "23:59"
+            ? `${addOneDay(event.end_date)}T00:00:00+09:00`
+            : `${event.end_date}T${event.end_time.slice(0, 5)}:00+09:00`,
+          timeZone: "Asia/Seoul",
+        },
+    extendedProperties: {
+      private: { ccb_personal_id: event.id, ccb_owner_id: event.owner_id },
+    },
+  };
+  let response = await fetch(url, { headers, cache: "no-store" });
+  if (response.status === 404) {
+    const created = await fetch(base, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ ...body, id, reminders: { useDefault: true } }),
+      cache: "no-store",
+    });
+    if (created.ok) return;
+    // 두 요청이 동시에 생성했거나 이전 응답만 유실된 경우 같은 ID를 다시 조회합니다.
+    if (created.status !== 409) {
+      throw new Error("Google Calendar에 개인 일정을 추가하지 못했어요. 연결을 확인하고 다시 연동해주세요.");
+    }
+    response = await fetch(url, { headers, cache: "no-store" });
+  }
+  if (response.status === 410) {
+    throw new Error("Google에서 삭제된 일정이에요. 앱의 개인 일정을 새로 등록해주세요.");
+  }
+  if (!response.ok) {
+    throw new Error("Google Calendar의 개인 일정을 확인하지 못했어요. 연결을 확인하고 다시 연동해주세요.");
+  }
+  const existing = await response.json() as PersonalCalendarRecord;
+  assertPersonalCalendarOwner(existing, event);
+  if (existing.status === "cancelled") {
+    throw new Error("Google에서 삭제된 일정이에요. 앱의 개인 일정을 새로 등록해주세요.");
+  }
+  const patched = await fetch(url, {
+    method: "PATCH",
+    headers: { ...headers, ...(existing.etag ? { "If-Match": existing.etag } : {}) },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+  if (!patched.ok) {
+    throw new Error("Google Calendar 갱신에 실패했어요. 다시 연동해주세요.");
+  }
+}
+
+export async function deletePersonalGoogleCalendarEvent(
+  event: import("@/lib/personal-events").PersonalEvent,
+): Promise<void> {
+  const token = await getGoogleAccessToken();
+  const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events/${personalCalendarId(event.id)}`;
+  const headers = { Authorization: `Bearer ${token}` };
+  const response = await fetch(url, { headers, cache: "no-store" });
+  if (response.status === 404 || response.status === 410) return;
+  if (!response.ok) throw new Error("Google Calendar 연결을 확인한 뒤 다시 삭제해주세요.");
+  const existing = await response.json() as PersonalCalendarRecord;
+  if (existing.status === "cancelled") return;
+  assertPersonalCalendarOwner(existing, event);
+  const removed = await fetch(url, {
+    method: "DELETE",
+    headers: { ...headers, ...(existing.etag ? { "If-Match": existing.etag } : {}) },
+    cache: "no-store",
+  });
+  if (!removed.ok && removed.status !== 404 && removed.status !== 410) {
+    throw new Error("Google Calendar 일정 삭제에 실패했어요. 다시 삭제해주세요.");
+  }
+}

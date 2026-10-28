@@ -457,13 +457,13 @@ export default function BookingCalendar({ slots }: BookingCalendarProps) {
           })}
         </div>
 
-        <p className="text-xs text-center text-purple-600 mt-3">
-          🟣 개인 일정 · 날짜를 누르면 제목과 메모를 볼 수 있어요.
-        </p>
-
         {/* 범례 */}
 
-        <div className="flex items-center justify-center gap-4 mt-4 text-[11px] text-warm-gray-400">
+        <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 mt-4 text-[11px] text-warm-gray-400">
+          <div className="flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-purple-400" />
+            개인 일정
+          </div>
           <div className="flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-green-400" />
             예약 가능
